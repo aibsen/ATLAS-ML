@@ -6,7 +6,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Flatten
 from keras.callbacks import ModelCheckpoint  
 
-from analysis import roc_curve
+from rocCurve import roc_curve
 
 def one_percent_mdr(y_true, y_pred):
     t = 0.01
