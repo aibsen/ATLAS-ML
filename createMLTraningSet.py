@@ -26,13 +26,13 @@ import sys
 __doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
 from docopt import docopt
 import os, MySQLdb, shutil, re, csv
-from utils import Struct, cleanOptions, readGenericDataFile, dbConnect
+from gkutils import Struct, cleanOptions, dbConnect
 from datetime import datetime
 from datetime import timedelta
 from rsyncImagesMultiprocess import workerImageDownloader
 from collections import defaultdict
 import subprocess
-from multiprocessingUtils import *
+from gkmultiprocessingUtils import *
 
 STAMPSTORM04 = "/atlas/bin/stampstorm04"
 LOG_FILE_LOCATION = '/' + os.uname()[1].split('.')[0] + '/tc_logs/'
@@ -63,8 +63,8 @@ def getKnownAsteroids(conn, camera, mjdMin, mjdMax, pkn = 900):
 
         cursor.close ()
 
-    except MySQLdb.Error, e:
-        print "Error %d: %s" % (e.args[0], e.args[1])
+    except MySQLdb.Error as e:
+        print("Error %d: %s" % (e.args[0], e.args[1]))
 
     return resultSet
 
@@ -96,8 +96,8 @@ def getJunk(conn, camera, mjdMin, mjdMax):
 
         cursor.close ()
 
-    except MySQLdb.Error, e:
-        print "Error %d: %s" % (e.args[0], e.args[1])
+    except MySQLdb.Error as e:
+        print("Error %d: %s" % (e.args[0], e.args[1]))
 
     return resultSet
 
@@ -118,9 +118,9 @@ def stampStormWrapper(exposureList, stampSize, stampLocation, objectType='good')
         output, errors = p.communicate()
 
         if output.strip():
-            print output
+            print(output)
         if errors.strip():
-            print errors
+            print(errors)
 
     return
 
@@ -132,7 +132,7 @@ def workerStampStorm(num, db, listFragment, dateAndTime, firstPass, miscParamete
 
     stampStormWrapper(listFragment, miscParameters[0], miscParameters[1], objectType = miscParameters[2])    
 
-    print "Process complete."
+    print("Process complete.")
     return 0
 
 
@@ -163,7 +163,7 @@ def main(argv = None):
 
     conn = dbConnect(hostname, username, password, database)
     if not conn:
-        print "Cannot connect to the database"
+        print("Cannot connect to the database")
         return 1
 
     currentDate = datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")
@@ -182,7 +182,7 @@ def main(argv = None):
     header="x,y,mag,dmag,ra,dec,obs".split(',')
 
     exposureList = []
-    for k,v in asteroidExpsDict.iteritems():
+    for k,v in asteroidExpsDict.items():
         exposureList.append(k)
         with open(stampLocation + '/' + 'good' + k + '.txt', 'w') as csvfile:
             w = csv.DictWriter(csvfile, fieldnames=header, delimiter=' ')
@@ -195,9 +195,9 @@ def main(argv = None):
     if len(exposureList) > 0:
         nProcessors, listChunks = splitList(exposureList, bins = stampThreads)
 
-        print "%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S"))
+        print("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
         parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'good'], drainQueues = False)
-        print "%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S"))
+        print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
 
     junkExps = getJunk(conn, options.camera, mjdMin, mjdMax)
     junkExpsDict = defaultdict(list)
@@ -205,7 +205,7 @@ def main(argv = None):
         junkExpsDict[exp['obs']].append(exp)
 
     exposureList = []
-    for k,v in junkExpsDict.iteritems():
+    for k,v in junkExpsDict.items():
         exposureList.append(k)
         with open(stampLocation + '/' + 'bad' + k + '.txt', 'w') as csvfile:
             w = csv.DictWriter(csvfile, fieldnames=header, delimiter=' ')
@@ -216,9 +216,9 @@ def main(argv = None):
     if len(exposureList) > 0:
         nProcessors, listChunks = splitList(exposureList, bins = stampThreads)
 
-        print "%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S"))
+        print("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
         parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'bad'], drainQueues = False)
-        print "%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S"))
+        print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
 
     conn.close()
 
