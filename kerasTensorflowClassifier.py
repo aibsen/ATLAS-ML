@@ -1,3 +1,22 @@
+#!/usr/bin/env python
+"""Read the training set and train a machine.
+
+Usage:
+  %s <trainingset>
+  %s (-h | --help)
+  %s --version
+
+Options:
+  -h --help                    Show this screen.
+  --version                    Show version.
+
+"""
+import sys
+__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
+from docopt import docopt
+import os, shutil, re
+from gkutils import Struct, cleanOptions
+
 import numpy as np
 import scipy.io as sio
 
@@ -59,10 +78,16 @@ def create_model(num_classes, image_dim):
     return model
 
 def main():
+    opts = docopt(__doc__, version='0.1')
+    opts = cleanOptions(opts)
 
-    path = ''
-    filename = 'andrei_20x20_skew3_signpreserve_f200000b600000.mat'
-    train_data, test_data, image_dim = load_data(path + filename)
+    # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
+    options = Struct(**opts)
+
+    filename = options.trainingset
+
+    #filename = 'andrei_20x20_skew3_signpreserve_f200000b600000.mat'
+    train_data, test_data, image_dim = load_data(filename)
 
     num_classes = 2
 
