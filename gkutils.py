@@ -30,3 +30,50 @@ def cleanOptions(options):
         cleanedOpts[k.replace('--','').replace('<','').replace('>','')] = v
 
     return cleanedOpts
+
+def doRsync(exposureSet, imageType, userId = 'xfer', remoteMachine = 'atlas-base-adm02.ifa.hawaii.edu', remoteLocation = '/atlas', localLocation = '/atlas', getMetadata = False, metadataExtension = '.tph'):
+
+    exposureSet.sort()
+    rsyncCmd = '/usr/bin/rsync'
+
+    if imageType not in ['diff','red']:
+        print("Image type must be diff or red")
+        return 1
+
+    imageExtension = {'diff':'.diff.fz','red':'.fits.fz'}
+
+    rsyncFile = '/tmp/rsyncFiles_' + imageType + str(os.getpid()) + '.txt'
+
+    # Create a diff and input rsync file
+    rsf = open(rsyncFile, 'w')
+    for exp in exposureSet:
+        camera = exp[0:3]
+        mjd = exp[3:8]
+
+        imageName = camera + '/' + mjd + '/' + exp + imageExtension[imageType]
+
+        if getMetadata:
+            # We don't need the image, just get the metadata
+            imageName = camera + '/' + mjd + '/' + exp + metadataExtension
+            if metadataExtension == '.tph' and int(mjd) >= 57350:
+                imageName = camera + '/' + mjd + '/' + 'AUX/' + exp + metadataExtension
+
+        rsf.write('%s\n' % imageName)
+
+    rsf.close()
+
+    remote = userId + '@' + remoteMachine + ':' + remoteLocation + '/' + imageType
+    local = localLocation + '/' + imageType
+
+    # Get the diff images
+    # 2018-04-16 KWS Removed the 'u' flag. We don't need to update the images.
+    p = subprocess.Popen([rsyncCmd, '-axKL', '--files-from=%s' % rsyncFile, remote, local], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, errors = p.communicate()
+
+    if output.strip():
+        print(output)
+    if errors.strip():
+        print(errors)
+
+    return 0
+

@@ -26,10 +26,9 @@ import sys
 __doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
 from docopt import docopt
 import os, MySQLdb, shutil, re, csv
-from gkutils import Struct, cleanOptions, dbConnect
+from gkutils import Struct, cleanOptions, dbConnect, doRsync
 from datetime import datetime
 from datetime import timedelta
-from rsyncImagesMultiprocess import workerImageDownloader
 from collections import defaultdict
 import subprocess
 from gkmultiprocessingUtils import *
@@ -123,6 +122,17 @@ def stampStormWrapper(exposureList, stampSize, stampLocation, objectType='good')
             print(errors)
 
     return
+
+
+def workerImageDownloader(num, db, listFragment, dateAndTime, firstPass, miscParameters):
+    """thread worker function"""
+    # Redefine the output to be a log file.
+    sys.stdout = open('%s%s_%s_%d.log' % (LOG_FILE_LOCATION, LOG_PREFIX_EXPOSURES, dateAndTime, num), "w")
+
+    # Call the postage stamp downloader
+    objectsForUpdate = doRsync(listFragment, miscParameters[0])
+    print ("Process complete.")
+    return 0
 
 
 def workerStampStorm(num, db, listFragment, dateAndTime, firstPass, miscParameters):
