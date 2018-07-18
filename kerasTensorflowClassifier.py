@@ -2,13 +2,16 @@
 """Read the training set and train a machine.
 
 Usage:
-  %s <trainingset>
+  %s <trainingset> [--bestfitfile=<bestfitfile>] [--outputcsv=<outputcsv>]
   %s (-h | --help)
   %s --version
 
 Options:
   -h --help                    Show this screen.
   --version                    Show version.
+  --bestfitfile=<bestfitfile>  Classifier file [default: atlas.model.best.hdf5].
+  --outputcsv=<outputcsv>      Output file [default: output.csv].
+
 
 """
 import sys
@@ -105,14 +108,14 @@ def main():
 
     model = create_model(num_classes, image_dim)
     """  
-    checkpointer = ModelCheckpoint(filepath='atlas.model.best.hdf5', \
+    checkpointer = ModelCheckpoint(filepath=options.classifierfile, \
                                    verbose=1, save_best_only=True)
 
     model.fit(x_train, y_train, batch_size=128, epochs=20, \
               validation_data=(x_valid, y_valid), \
               callbacks=[checkpointer], verbose=1, shuffle=True)
     """
-    model.load_weights('atlas.model.best.hdf5')
+    model.load_weights(options.classifierfile)
 
     (y_train, y_valid) = train_data[1][:split_frac], train_data[1][split_frac:]
 
@@ -131,7 +134,7 @@ def main():
     print((one_percent_mdr(y_test, pred[:,1])))
     print((one_percent_fpr(y_test, pred[:,1])))
 
-    output = open("tmp.csv","w")
+    output = open(options.outputfile,"w")
     for i in range(len(pred[:,1])):
         output.write("%s,%d,%.3lf\n"%(test_data[2][i], y_test[i], pred[i,1]))
     output.close()
