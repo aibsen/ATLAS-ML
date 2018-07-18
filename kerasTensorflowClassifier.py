@@ -2,15 +2,15 @@
 """Read the training set and train a machine.
 
 Usage:
-  %s <trainingset> [--bestfitfile=<bestfitfile>] [--outputcsv=<outputcsv>]
+  %s <trainingset> [--classifierfile=<classifierfile>] [--outputcsv=<outputcsv>]
   %s (-h | --help)
   %s --version
 
 Options:
-  -h --help                    Show this screen.
-  --version                    Show version.
-  --bestfitfile=<bestfitfile>  Classifier file [default: atlas.model.best.hdf5].
-  --outputcsv=<outputcsv>      Output file [default: output.csv].
+  -h --help                          Show this screen.
+  --version                          Show version.
+  --classifierfile=<classifierfile>  Classifier file [default: atlas.model.best.hdf5].
+  --outputcsv=<outputcsv>            Output file [default: output.csv].
 
 
 """
@@ -115,6 +115,17 @@ def main():
               validation_data=(x_valid, y_valid), \
               callbacks=[checkpointer], verbose=1, shuffle=True)
     """
+
+    if not os.path.exists(options.classifierfile):
+        # If we don't already have a trained classifier, train a new one.
+        checkpointer = ModelCheckpoint(filepath=options.classifierfile, \
+                                   verbose=1, save_best_only=True)
+
+        model.fit(x_train, y_train, batch_size=128, epochs=20, \
+              validation_data=(x_valid, y_valid), \
+              callbacks=[checkpointer], verbose=1, shuffle=True)
+
+
     model.load_weights(options.classifierfile)
 
     (y_train, y_valid) = train_data[1][:split_frac], train_data[1][split_frac:]
