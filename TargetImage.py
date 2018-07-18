@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import pyfits
+from astropy.io import fits as pyfits
 import pylab
 import random
 import numpy as np

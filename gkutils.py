@@ -8,7 +8,7 @@ def dbConnect(lhost, luser, lpasswd, ldb, lport=3306, quitOnError=True):
                                 db = ldb,
                               port = lport)
    except MySQLdb.Error as e:
-      print("Error %d: %s" % (e.args[0], e.args[1]))
+      print(("Error %d: %s" % (e.args[0], e.args[1])))
       if quitOnError:
          sys.exit (1)
       else:
@@ -25,7 +25,7 @@ class Struct:
 # 2017-11-02 KWS Quick and dirty code to clean options dictionary as extracted by docopt.
 def cleanOptions(options):
     cleanedOpts = {}
-    for k,v in options.items():
+    for k,v in list(options.items()):
         # Get rid of -- and <> from opts
         cleanedOpts[k.replace('--','').replace('<','').replace('>','')] = v
 
@@ -76,4 +76,55 @@ def doRsync(exposureSet, imageType, userId = 'xfer', remoteMachine = 'atlas-base
         print(errors)
 
     return 0
+
+def readGenericDataFile(filename, delimiter = ' ', skipLines = 0, fieldnames = None, useOrderedDict = False):
+   import csv
+   from collections import OrderedDict
+
+   # Sometimes the file has a very annoying initial # character on the first line.
+   # We need to delete this character or replace it with a space.
+
+   if type(filename).__name__ == 'file' or type(filename).__name__ == 'instance':
+      f = filename
+   else:
+      f = open(filename)
+
+   if skipLines > 0:
+      [f.readline() for i in range(skipLines)]
+
+   # We'll assume a comment line immediately preceding the data is the column headers.
+
+   # If we already have a header line, skip trying to read the header
+   if not fieldnames:
+      index = 0
+      header = f.readline().strip()
+      if header[0] == '#':
+         # Skip the hash
+         index = 1
+
+      if delimiter == ' ': # or delimiter == '\t':
+         # Split on whitespace, regardless of however many spaces or tabs between fields
+         fieldnames = header[index:].strip().split()
+      else:
+         fieldnames = header[index:].strip().split(delimiter)
+
+   # 2018-02-12 KWS Strip out whitespace from around any fieldnames
+   fieldnames = [x.strip() for x in fieldnames]
+   # The file pointer is now at line 2
+
+   t = csv.DictReader(f, fieldnames = fieldnames, delimiter=delimiter, skipinitialspace = True)
+
+   data = []
+   for row in t:
+      if useOrderedDict:
+          data.append(OrderedDict((key, row[key]) for key in fieldnames))
+      else:
+          data.append(row)
+
+   # Only close the file if we opened it in the first place
+   if not (type(filename).__name__ == 'file' or type(filename).__name__ == 'instance'):
+      f.close()
+
+   # We now have the data as a dictionary.
+   return data
 
