@@ -8,7 +8,7 @@ def dbConnect(lhost, luser, lpasswd, ldb, lport=3306, quitOnError=True):
                                 db = ldb,
                               port = lport)
    except MySQLdb.Error as e:
-      print("Error %d: %s" % (e.args[0], e.args[1]))
+      print(("Error %d: %s" % (e.args[0], e.args[1])))
       if quitOnError:
          sys.exit (1)
       else:
@@ -25,7 +25,7 @@ class Struct:
 # 2017-11-02 KWS Quick and dirty code to clean options dictionary as extracted by docopt.
 def cleanOptions(options):
     cleanedOpts = {}
-    for k,v in options.items():
+    for k,v in list(options.items()):
         # Get rid of -- and <> from opts
         cleanedOpts[k.replace('--','').replace('<','').replace('>','')] = v
 
@@ -90,7 +90,7 @@ def readGenericDataFile(filename, delimiter = ' ', skipLines = 0, fieldnames = N
       f = open(filename)
 
    if skipLines > 0:
-      [f.readline() for i in xrange(skipLines)]
+      [f.readline() for i in range(skipLines)]
 
    # We'll assume a comment line immediately preceding the data is the column headers.
 
