@@ -9,8 +9,8 @@ Usage:
 Options:
   -h --help                          Show this screen.
   --version                          Show version.
-  --classifierfile=<classifierfile>  Classifier file [default: atlas.model.best.hdf5].
-  --outputcsv=<outputcsv>            Output file [default: output.csv].
+  --classifierfile=<classifierfile>  Classifier file [default: /tmp/atlas.model.best.hdf5].
+  --outputcsv=<outputcsv>            Output file [default: /tmp/output.csv].
 
 
 """
@@ -120,6 +120,7 @@ def main():
         # If we don't already have a trained classifier, train a new one.
         checkpointer = ModelCheckpoint(filepath=options.classifierfile, \
                                    verbose=1, save_best_only=True)
+        print(checkpointer)
 
         model.fit(x_train, y_train, batch_size=128, epochs=20, \
               validation_data=(x_valid, y_valid), \
@@ -145,7 +146,7 @@ def main():
     print((one_percent_mdr(y_test, pred[:,1])))
     print((one_percent_fpr(y_test, pred[:,1])))
 
-    output = open(options.outputfile,"w")
+    output = open(options.outputcsv,"w")
     for i in range(len(pred[:,1])):
         output.write("%s,%d,%.3lf\n"%(test_data[2][i], y_test[i], pred[i,1]))
     output.close()
