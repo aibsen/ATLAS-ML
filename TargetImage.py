@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from astropy.io import fits as pyfits
+#import pyfits
 import pylab
 import random
 import numpy as np
@@ -28,7 +29,7 @@ class TargetImage(object):
         maxX = np.shape(data[0])
         maxY = np.shape(data[1])
         imageCentre = (maxX[0]/2.0, maxY[0]/2.0) # changed to float division, shouldn't make a difference
-        self.object = data[imageCentre[0]-extent: imageCentre[0]+extent, imageCentre[0]-extent: imageCentre[0]+extent]
+        self.object = data[int(imageCentre[0]-extent): int(imageCentre[0]+extent),int(imageCentre[0]-extent): int(imageCentre[0]+extent)]
 
     def getObject(self):
         return self.object
