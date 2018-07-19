@@ -19,7 +19,7 @@ __doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
 from docopt import docopt
 import os, shutil, re
 from gkutils import Struct, cleanOptions
-
+import h5py
 import numpy as np
 import scipy.io as sio
 
@@ -41,11 +41,12 @@ def one_percent_fpr(y_true, y_pred):
     return 1-tpr[np.where(fpr<=t)[0]][0]
 
 def load_data(filename):
-    data = sio.loadmat(filename)
-
+    #data = sio.loadmat(filename)
+    data = h5py.File(filename,'r')
     X = data['X']
     y_train = np.squeeze(data['y'])
-    train_files = np.squeeze(data['train_files'])
+    ascii_train_files = data['train_files']
+    train_files = np.squeeze([n.decode("utf-8") for n in ascii_train_files])
     m, n = X.shape
     image_dim = int(np.sqrt(n))
     x_train = np.zeros((m, image_dim, image_dim, 1))
@@ -54,7 +55,8 @@ def load_data(filename):
 
     X = data['testX']
     y_test = np.squeeze(data['testy'])
-    test_files = np.squeeze(data['test_files'])
+    ascii_test_files = data['test_files']
+    test_files = np.squeeze([n.decode("utf-8") for n in ascii_test_files])
     m, n = X.shape
     x_test = np.zeros((m, image_dim, image_dim, 1))
     for i in range(m):

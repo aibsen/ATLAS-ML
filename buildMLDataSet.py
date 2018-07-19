@@ -289,7 +289,7 @@ def main():
     hf.create_dataset('testX',data=testX)
     hf.create_dataset('testy',data=testy)
     hf.create_dataset('test_files',data=ascii_test_files)
-    
+    hf.close() 
     print("[+] Processing complete.")
     print("[*] Run time: %d minutes." % ((time.time() - startTime) / 60))
     
