@@ -1,5 +1,6 @@
 import optparse, time
 import numpy as np
+import h5py
 import scipy.io as sio
 from TargetImage import *
 from scipy.ndimage import gaussian_filter
@@ -51,7 +52,7 @@ def bg_sub_signPreserveNorm(imageFile, path, extent, extension):
     return np.ravel(image - dilated, order="F")
     
 def generate_vectors(imageList, path, extent, normFunc, extension):
-
+    print(path)
     m = len(imageList)
     X = np.ones((m, 4*extent*extent))
 
@@ -85,7 +86,10 @@ def process_examples(list, path, label, extent, normFunc, extension, trainingFra
     grouped_dict = group_images(list[:])
     
     # randomly shuffle keys
-    tti_keys = list(grouped_dict.keys())
+    # tti_keys = list(grouped_dict.keys()) this does not work on python3
+    tti_keys = []
+    for k in grouped_dict.keys():
+        tti_keys.append(k)
     np.random.shuffle(tti_keys)
     
     i = 0
@@ -236,7 +240,11 @@ def main():
         path = posFile.strip(posFile.split("/")[-1])
         print(path)
         X = generate_vectors(imageList, path, extent, normFunc, extension)
-        sio.savemat(outputFile, {"X": X, "images": imageList})
+        #sio.savemat(outputFile, {"X": X, "images": imageList})
+        hf = h5py.File(outputFile,'w')
+        hf.create_dataset('X', data=X)
+        hf.create_dataset('images',data=imageList)
+        hf.close()
         exit(0)
 
     # process positive examples
@@ -270,8 +278,18 @@ def main():
     testX, testy, test_files = build_data_set(pos_data[3:], neg_data[3:])
 
     print("[+] Saving data sets.")
-    sio.savemat(outputFile, {"X": X, "y":y, "train_files": train_files, \
-                             "testX":testX, "testy":testy, "test_files":test_files})
+    # sio.savemat(outputFile, {"X": X, "y":y, "train_files": train_files, \
+    #                         "testX":testX, "testy":testy, "test_files":test_files})
+    ascii_train_files = [n.encode("ascii", "ignore") for n in train_files]
+    ascii_test_files = [n.encode("ascii", "ignore") for n in test_files] 
+    hf=h5py.File(outputFile,'w')
+    hf.create_dataset('X',data=X)
+    hf.create_dataset('y',data=y)
+    hf.create_dataset('train_files',data=ascii_train_files)
+    hf.create_dataset('testX',data=testX)
+    hf.create_dataset('testy',data=testy)
+    hf.create_dataset('test_files',data=ascii_test_files)
+    
     print("[+] Processing complete.")
     print("[*] Run time: %d minutes." % ((time.time() - startTime) / 60))
     

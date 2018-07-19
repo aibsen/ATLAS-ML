@@ -199,12 +199,6 @@ def main(argv = None):
             #w.writeheader()
             for row in v:
                 w.writerow(row)
-        with open(stampLocation + '/good.txt', 'a') as csvfileg:
-            wg = csv.DictWriter(csvfileg, fieldnames=header, delimiter=' ')
-            for row in v:
-                wg.writerow(row)
-
-
     # So now let stampstorm do its stuff
 
     if len(exposureList) > 0:
@@ -227,10 +221,6 @@ def main(argv = None):
             #w.writeheader()
             for row in v:
                 w.writerow(row)
-        with open(stampLocation + '/bad.txt', 'a') as csvfileb:
-            wb = csv.DictWriter(csvfileb, fieldnames=header, delimiter=' ')
-            for row in v:
-                wb.writerow(row)
 
     if len(exposureList) > 0:
         nProcessors, listChunks = splitList(exposureList, bins = stampThreads)
