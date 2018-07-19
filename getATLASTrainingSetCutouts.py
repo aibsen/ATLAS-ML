@@ -5,7 +5,7 @@ everything else that has pvr and ptr = 0. This code only works on the database c
 ddc files.
 
 Usage:
-  %s <configFile> [--days=<n>] [--mjdMin=<mjdMin>] [--mjdMax=<mjdMax>] [--stampSize=<n>] [--stampLocation=<location>] [--test] [--downloadthreads=<threads>] [--stampThreads=<threads>] [--camera=<camera>]
+  %s <configFile> [<mjd>...] [--stampSize=<n>] [--stampLocation=<location>] [--test] [--downloadthreads=<threads>] [--stampThreads=<threads>] [--camera=<camera>]
   %s (-h | --help)
   %s --version
 
@@ -14,8 +14,6 @@ Options:
   --version                    Show version.
   --test                       Just do a quick test.
   --stampSize=<n>              Size of the postage stamps if requested [default: 40].
-  --mjdMin=<mjdMin>            Minimum MJD.
-  --mjdMax=<mjdMax>            Maximum MJD.
   --stampLocation=<location>   Default place to store the stamps. [default: /tmp]
   --camera=<camera>            Which camera [default: 02a]
   --downloadthreads=<threads>  The number of threads (processes) to use [default: 5].
@@ -37,7 +35,7 @@ STAMPSTORM04 = "/atlas/bin/stampstorm04"
 LOG_FILE_LOCATION = '/' + os.uname()[1].split('.')[0] + '/tc_logs/'
 LOG_PREFIX_EXPOSURES = 'background_exposure_downloads'
 
-def getKnownAsteroids(conn, camera, mjdMin, mjdMax, pkn = 900):
+def getKnownAsteroids(conn, camera, mjd, pkn = 900):
     """
     Get the asteroids.
     """
@@ -57,7 +55,7 @@ def getKnownAsteroids(conn, camera, mjdMin, mjdMax, pkn = 900):
                and d.det = 0
                and d.mag > 0.0
           order by m.obs
-        """, (camera, mjdMin, mjdMax, pkn))
+        """, (camera, mjd, mjd + 1, pkn))
         resultSet = cursor.fetchall ()
 
         cursor.close ()
@@ -68,7 +66,7 @@ def getKnownAsteroids(conn, camera, mjdMin, mjdMax, pkn = 900):
     return resultSet
 
 
-def getJunk(conn, camera, mjdMin, mjdMax):
+def getJunk(conn, camera, mjd):
     """
     Get the garbage.
     """
@@ -90,7 +88,7 @@ def getJunk(conn, camera, mjdMin, mjdMax):
                and d.det = 0
                and d.mag > 0.0
           order by m.obs
-        """, (camera, mjdMin, mjdMax))
+        """, (camera, mjd, mjd+1))
         resultSet = cursor.fetchall ()
 
         cursor.close ()
@@ -160,8 +158,11 @@ def main(argv = None):
         config = yaml.load(yaml_file)
 
     stampSize = int(options.stampSize)
-    mjdMin = float(options.mjdMin)
-    mjdMax = float(options.mjdMax)
+    mjds = options.mjd
+    if not mjds:
+        print ("No MJDs specified")
+        return 1
+
     downloadThreads = int(options.downloadthreads)
     stampThreads = int(options.stampThreads)
     stampLocation = options.stampLocation
@@ -180,11 +181,11 @@ def main(argv = None):
     (year, month, day, hour, min, sec) = currentDate.split(':')
     dateAndTime = "%s%s%s_%s%s%s" % (year, month, day, hour, min, sec)
 
-    asteroidExps = getKnownAsteroids(conn, options.camera, mjdMin, mjdMax, pkn = 900)
     asteroidExpsDict = defaultdict(list)
-    # We need to create one file per exposure for stampstorm
-    for exp in asteroidExps:
-        asteroidExpsDict[exp['obs']].append(exp)
+    for mjd in mjds:
+        asteroidExps = getKnownAsteroids(conn, options.camera, int(mjd), pkn = 900)
+        for exp in asteroidExps:
+            asteroidExpsDict[exp['obs']].append(exp)
     
     # Now create the files.  We need to have x, y as the first two items.
 
@@ -208,10 +209,11 @@ def main(argv = None):
         parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'good'], drainQueues = False)
         print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
 
-    junkExps = getJunk(conn, options.camera, mjdMin, mjdMax)
     junkExpsDict = defaultdict(list)
-    for exp in junkExps:
-        junkExpsDict[exp['obs']].append(exp)
+    for mjd in mjds:
+        junkExps = getJunk(conn, options.camera, int(mjd))
+        for exp in junkExps:
+            junkExpsDict[exp['obs']].append(exp)
 
     exposureList = []
     for k,v in junkExpsDict.items():
