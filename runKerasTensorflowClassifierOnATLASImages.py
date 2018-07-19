@@ -1,9 +1,76 @@
+#!/usr/bin/env python
+"""Run the Keras/Tensorflow classifier.
+
+Usage:
+  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--outputsql=<outputsql>] [--listid=<listid>] [--imageroot=<imageroot>]
+  %s (-h | --help)
+  %s --version
+
+Options:
+  -h --help                          Show this screen.
+  --version                          Show version.
+  --listid=<listid>                  List ID [default: 4].
+  --hkoclassifier=<hkoclassifier>    HKO Classifier file.
+  --mloclassifier=<mloclassifier>    MLO Classifier file.
+  --outputsql=<outputsql>            Output file [default: /tmp/update_eyeball_scores.sql].
+  --imageroot=<imageroot>            Root location of the actual images [default: /localhost/images/].
+
+
+"""
+import sys
+__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
+from docopt import docopt
+from gkutils import Struct, cleanOptions, readGenericDataFile, dbConnect
 import sys, csv, os
-from gkutils import readGenericDataFile
 from TargetImage import *
 import numpy as np
 from kerasTensorflowClassifier import create_model, load_data
 from collections import defaultdict, OrderedDict
+
+def getATLASImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/'):
+    # First get the candidates
+    import MySQLdb
+    try:
+        cursor = conn.cursor (MySQLdb.cursors.DictCursor)
+
+        cursor.execute ("""
+            select id
+              from atlas_diff_objects
+             where detection_list_id = %s
+               and zooniverse_score is null
+        """, (listId,))
+        resultSet = cursor.fetchall ()
+
+
+    except MySQLdb.Error as e:
+        print("Error %d: %s" % (e.args[0], e.args[1]))
+
+    images = []
+    # Now, for each candidate, get the image
+    for row in resultSet:
+        try:
+            cursor = conn.cursor (MySQLdb.cursors.DictCursor)
+            cursor.execute ("""
+            select concat(%s ,%s,'/',truncate(mjd_obs,0), '/', image_filename,'.fits') filename from tcs_postage_stamp_images
+             where image_filename like concat(%s, '%%')
+               and image_filename not like concat(%s, '%%4300000000%%')
+               and image_type = 'diff'
+               and image_filename is not null
+               and pss_error_code = 0
+               and mjd_obs is not null
+            """, (imageRoot, dbName, row['id'], row['id']))
+            imageResultSet = cursor.fetchall ()
+            cursor.close ()
+            for row in imageResultSet:
+                # Only append images that actually exist!
+                if os.path.exists(row['filename']):
+                    images.append(row)
+
+        except MySQLdb.Error as e:
+            print("Error %d: %s" % (e.args[0], e.args[1]))
+
+    return images
+
 
 def getRBValues(imageFilenames, classifier):
     num_classes = 2
@@ -39,17 +106,29 @@ def getRBValues(imageFilenames, classifier):
     return objectDict
 
 
-def main(argv = None):
-    if argv is None:
-        argv = sys.argv
+def main():
+    opts = docopt(__doc__, version='0.1')
+    opts = cleanOptions(opts)
 
+    # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
+    options = Struct(**opts)
 
-    usage = "Usage: %s <filename list>" % argv[0]
-    if len(argv) < 2:
-        sys.exit(usage)
+    import yaml
+    with open(options.configFile) as yaml_file:
+        config = yaml.load(yaml_file)
 
-    filenames = argv[1]
-    imageFilenames = readGenericDataFile(filenames, delimiter = ' ')
+    username = config['databases']['local']['username']
+    password = config['databases']['local']['password']
+    database = config['databases']['local']['database']
+    hostname = config['databases']['local']['hostname']
+
+    conn = dbConnect(hostname, username, password, database)
+    if not conn:
+        print("Cannot connect to the database")
+        return 1
+
+    imageFilenames = getATLASImageDataToCheck(conn, database, listId = int(options.listid), imageRoot=options.imageroot)
+    print(imageFilenames)
 
     # Split the images into HKO and MLO data so we can apply the HKO and MLO machines separately.
     hkoFilenames = []
@@ -65,11 +144,11 @@ def main(argv = None):
     #train_data, test_data, image_dim = load_data(filename)
     #x_test = test_data[0]
 
-    hkoClassifier = '/home/kws/keras/hko_57966_20x20_skew3_signpreserve_f77475b232425.model.best.hdf5'
-    mloClassifier = '/home/kws/keras/atlas_mlo_57925_20x20_skew3_signpreserve_f331184b993662.model.best.hdf5'
+    #hkoClassifier = '/home/kws/keras/hko_57966_20x20_skew3_signpreserve_f77475b232425.model.best.hdf5'
+    #mloClassifier = '/home/kws/keras/atlas_mlo_57925_20x20_skew3_signpreserve_f331184b993662.model.best.hdf5'
 
-    objectDictHKO = getRBValues(hkoFilenames, hkoClassifier)
-    objectDictMLO = getRBValues(mloFilenames, mloClassifier)
+    objectDictHKO = getRBValues(hkoFilenames, options.hkoclassifier)
+    objectDictMLO = getRBValues(mloFilenames, options.mloclassifier)
 
     # Now we have two dictionaries. Combine them.
 
@@ -82,6 +161,10 @@ def main(argv = None):
 
     # Some objects will have data from two telescopes, some only one.
     # If we have data from two telescopes, choose the median value of the longest length list.
+
+    print(objectScores)
+
+    return
 
     finalScores = {}
 
@@ -105,11 +188,12 @@ def main(argv = None):
     finalScoresSorted = OrderedDict(sorted(list(finalScores.items()), key=lambda t: t[1]))
 
     # Generate the insert statements
-    with open("/home/kws/keras/update_eyeball_scores.sql", 'w') as f:
+    with open(options.outputsql, 'w') as f:
         for k, v in list(finalScoresSorted.items()):
             print((k, finalScoresSorted[k]))
             f.write("update atlas_diff_objects set zooniverse_score = %f where id = %s;\n" % (finalScoresSorted[k], k))
 
+    conn.close()
 
 
 if __name__=='__main__':
