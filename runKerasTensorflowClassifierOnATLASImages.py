@@ -37,7 +37,7 @@ def getATLASImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/
             select id
               from atlas_diff_objects
              where detection_list_id = %s
-               and zooniverse_score is null
+               and zooniverse_score is not null
         """, (listId,))
         resultSet = cursor.fetchall ()
 
@@ -128,7 +128,6 @@ def main():
         return 1
 
     imageFilenames = getATLASImageDataToCheck(conn, database, listId = int(options.listid), imageRoot=options.imageroot)
-    print(imageFilenames)
 
     # Split the images into HKO and MLO data so we can apply the HKO and MLO machines separately.
     hkoFilenames = []
@@ -152,19 +151,15 @@ def main():
 
     # Now we have two dictionaries. Combine them.
 
-    objectScores = {}
+    objectScores = defaultdict(dict)
 
     for k, v in list(objectDictHKO.items()):
-        objectScores[k] = {'hko': np.array(v)}
+        objectScores[k]['hko'] = np.array(v)
     for k, v in list(objectDictMLO.items()):
-        objectScores[k] = {'mlo': np.array(v)}
+        objectScores[k]['mlo'] = np.array(v)
 
     # Some objects will have data from two telescopes, some only one.
     # If we have data from two telescopes, choose the median value of the longest length list.
-
-    print(objectScores)
-
-    return
 
     finalScores = {}
 
