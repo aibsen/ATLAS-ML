@@ -82,14 +82,14 @@ def create_model(num_classes, image_dim):
                   kerasmetrics=['accuracy'])
     return model
 
-def main():
-    opts = docopt(__doc__, version='0.1')
-    opts = cleanOptions(opts)
+def kerasTensorflowClassifier(options):
+   # opts = docopt(__doc__, version='0.1')
+   # opts = cleanOptions(opts)
 
     # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
-    options = Struct(**opts)
+    #options = Struct(**opts)
 
-    filename = options.trainingset
+    filename = options['trainingset']
 
     #filename = 'andrei_20x20_skew3_signpreserve_f200000b600000.mat'
     train_data, test_data, image_dim = load_data(filename)
@@ -118,9 +118,9 @@ def main():
               callbacks=[checkpointer], verbose=1, shuffle=True)
     """
 
-    if not os.path.exists(options.classifierfile):
+    if not os.path.exists(options['classifierfile']):
         # If we don't already have a trained classifier, train a new one.
-        checkpointer = ModelCheckpoint(filepath=options.classifierfile, \
+        checkpointer = ModelCheckpoint(filepath=options['classifierfile'], \
                                    verbose=1, save_best_only=True)
         print(checkpointer)
 
@@ -129,7 +129,7 @@ def main():
               callbacks=[checkpointer], verbose=1, shuffle=True)
 
 
-    model.load_weights(options.classifierfile)
+    model.load_weights(options['classifierfile'])
 
     (y_train, y_valid) = train_data[1][:split_frac], train_data[1][split_frac:]
 
@@ -148,11 +148,11 @@ def main():
     print((one_percent_mdr(y_test, pred[:,1])))
     print((one_percent_fpr(y_test, pred[:,1])))
 
-    output = open(options.outputcsv,"w")
+    output = open(options['outputcsv'],"w")
     for i in range(len(pred[:,1])):
         output.write("%s,%d,%.3lf\n"%(test_data[2][i], y_test[i], pred[i,1]))
     output.close()
 
 if  __name__ == '__main__':
-    main()
+    kerasTensorflowClassifier(options)
 
