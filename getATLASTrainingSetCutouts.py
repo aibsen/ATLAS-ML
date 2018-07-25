@@ -21,14 +21,13 @@ Options:
 
 """
 import sys
-__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
-from docopt import docopt
-import os, MySQLdb, shutil, re, csv
+#__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
+#from docopt import docopt
+import os, MySQLdb, shutil, re, csv, subprocess
 from gkutils import Struct, cleanOptions, dbConnect, doRsync
 from datetime import datetime
 from datetime import timedelta
 from collections import defaultdict
-import subprocess
 from gkmultiprocessingUtils import *
 
 STAMPSTORM04 = "/atlas/bin/stampstorm04"
@@ -108,9 +107,18 @@ def stampStormWrapper(exposureList, stampSize, stampLocation, objectType='good')
         inFile = stampLocation + '/' + objectType + exp + '.txt'
 
         if objectType == 'good':
-            os.chdir(stampLocation + '/2')
+            goodDir = stampLocation+'/good'
+            if not os.path.exists(goodDir):
+                print("creating"+goodDir)
+                os.makedirs(goodDir)
+            os.chdir(goodDir)
+
         else:
-            os.chdir(stampLocation + '/0')
+            badDir = stampLocation+'/bad'
+            if not os.path.exists(badDir):
+                os.makedirs(badDir)   
+            os.chdir(badDir)
+
         p = subprocess.Popen([STAMPSTORM04, inFile, imageName, objectType, str(stampSize/2)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, errors = p.communicate()
 
@@ -141,32 +149,42 @@ def workerStampStorm(num, db, listFragment, dateAndTime, firstPass, miscParamete
     stampStormWrapper(listFragment, miscParameters[0], miscParameters[1], objectType = miscParameters[2])    
 
     print("Process complete.")
-    return 0
+    return 0 
 
 
+def getGoodBadFiles(path):
+       
+    with open(path+'/good.txt', 'a') as good:
+            for file in os.listdir(path+'/good'):
+                    good.write(file+'\n')
 
+    with open(path+'/bad.txt', 'a') as bad:
+            for file in os.listdir(path+'/bad'):
+                    bad.write(file+'\n')
+    print("Generated good and bad files")
 
-def main(argv = None):
-    opts = docopt(__doc__, version='0.1')
-    opts = cleanOptions(opts)
-
+def getATLASTrainingSetCutouts(options):
+#    opts = docopt(__doc__, version='0.1')
+#    opts = cleanOptions(opts)
+    #print(opts)
     # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
-    options = Struct(**opts)
-
+#    options = Struct(**opts)
+    print(options)
     import yaml
-    with open(options.configFile) as yaml_file:
+    with open(options['configFile']) as yaml_file:
         config = yaml.load(yaml_file)
 
-    stampSize = int(options.stampSize)
-    mjds = options.mjd
+    stampSize = int(options['stampSize'])
+    mjds = options['mjds']
     if not mjds:
         print ("No MJDs specified")
         return 1
 
-    downloadThreads = int(options.downloadthreads)
-    stampThreads = int(options.stampThreads)
-    stampLocation = options.stampLocation
-
+    downloadThreads = int(options['downloadthreads'])
+    stampThreads = int(options['stampThreads'])
+    stampLocation = options['stampLocation']
+    if not os.path.exists(stampLocation):
+        os.makedirs(stampLocation)
     username = config['databases']['local']['username']
     password = config['databases']['local']['password']
     database = config['databases']['local']['database']
@@ -183,7 +201,7 @@ def main(argv = None):
 
     asteroidExpsDict = defaultdict(list)
     for mjd in mjds:
-        asteroidExps = getKnownAsteroids(conn, options.camera, int(mjd), pkn = 900)
+        asteroidExps = getKnownAsteroids(conn, options['camera'], int(mjd), pkn = 900)
         for exp in asteroidExps:
             asteroidExpsDict[exp['obs']].append(exp)
     
@@ -211,7 +229,7 @@ def main(argv = None):
 
     junkExpsDict = defaultdict(list)
     for mjd in mjds:
-        junkExps = getJunk(conn, options.camera, int(mjd))
+        junkExps = getJunk(conn, options['camera'], int(mjd))
         for exp in junkExps:
             junkExpsDict[exp['obs']].append(exp)
 
@@ -230,10 +248,10 @@ def main(argv = None):
         print("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
         parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'bad'], drainQueues = False)
         print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
-
+    
     conn.close()
+    getGoodBadFiles(stampLocation)
 
-
-if __name__=='__main__':
-    main()
+#if __name__=='__main__':
+#    main()
     
