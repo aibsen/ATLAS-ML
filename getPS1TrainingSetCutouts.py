@@ -47,6 +47,7 @@ def getGoodPS1Objects(conn, listId):
                and observation_status = 'mover'
                and confidence_factor is not null
                and (comment like 'EPH:%%' or comment like 'MPC:%%')
+             limit 100
         """, (listId,))
         resultSet = cursor.fetchall ()
 
@@ -69,11 +70,11 @@ def getBadPS1Objects(conn, listId, rbThreshold = 0.1):
 
         cursor.execute ("""
             select distinct o.id
-              from tcs_transient_objects o, tcs_object_comments c
-             where o.id = c.transient_object_id
-               and confidence_factor < %s 
+              from tcs_transient_objects o
+             where confidence_factor < %s 
                and detection_list_id = %s
-               and (comment like 'EPH:.%' or comment like 'MPC:%%')
+               and sherlockClassification is not null
+             limit 1000
         """, (rbThreshold, listId,))
         resultSet = cursor.fetchall ()
 
@@ -114,24 +115,39 @@ def getImagesForObject(conn, objectId):
     return resultSet
 
 
-def getTrainingSetImages(conn, listId, imageHome = '/psdb2/images/'):
+def getTrainingSetImages(conn, imageHome = '/psdb2/images/ps13pi/'):
     goodObjects = getGoodPS1Objects(conn, listId = 5)
+
+    print("Number of good objects = ", len(goodObjects))
+    class ImageSet:
+        pass
 
     goodImages = []
     for candidate in goodObjects:
         images = getImagesForObject(conn, candidate['id'])
 
         for image in images:
-            goodImages.append(image['image_filename'])
+            mjd = image['image_filename'].split('_')[1].split('.')[0]
+            imageName = imageHome+mjd+'/' + image['image_filename']+'.fits'
+            goodImages.append(imageName)
 
-    badObjects = getBadPS1Objects(conn, listId = 5)
+    badObjects = getBadPS1Objects(conn, listId = 0)
+    print("Number of bad objects = ", len(badObjects))
     
     badImages = []
     for candidate in badObjects:
         images = getImagesForObject(conn, candidate['id'])
 
         for image in images:
-            badImages.append(image['image_filename'])
+            mjd = image['image_filename'].split('_')[1].split('.')[0]
+            imageName = imageHome+mjd+'/' + image['image_filename']+'.fits'
+            badImages.append(imageName)
+
+    images = ImageSet()
+    images.good = goodImages
+    images.bad = badImages
+
+    return images
 
 
 def getGoodBadFiles(path):
@@ -143,6 +159,17 @@ def getGoodBadFiles(path):
     with open(path+'/bad.txt', 'a') as bad:
             for file in os.listdir(path+'/bad'):
                     bad.write(file+'\n')
+    print("Generated good and bad files")
+
+def writePS1GoodBadFiles(path, images):
+    with open(path+'/good.txt', 'a') as good:
+        for file in images.good:
+            good.write(file+'\n')
+        
+
+    with open(path+'/bad.txt', 'a') as bad:
+        for file in images.bad:
+            bad.write(file+'\n')
     print("Generated good and bad files")
 
 
@@ -157,9 +184,7 @@ def main(argv = None):
 
     stampLocation = options.stampLocation
 
-    print(stampLocation)
 
-    return
     if not os.path.exists(stampLocation):
         os.makedirs(stampLocation)
 
@@ -173,58 +198,14 @@ def main(argv = None):
         print("Cannot connect to the database")
         return 1
 
-    asteroidExpsDict = defaultdict(list)
-    for mjd in mjds:
-        asteroidExps = getKnownAsteroids(conn, options.camera, int(mjd), pkn = 900)
-        for exp in asteroidExps:
-            asteroidExpsDict[exp['obs']].append(exp)
+
+    images = getTrainingSetImages(conn)
+
+    writePS1GoodBadFiles(options.stampLocation, images)
+
     
-    # Now create the files.  We need to have x, y as the first two items.
-
-    #m.obs, d.x, d.y, d.mag, d.dmag, d.ra, d.dec
-    header="x,y,mag,dmag,ra,dec,obs".split(',')
-
-    exposureList = []
-    for k,v in asteroidExpsDict.items():
-        exposureList.append(k)
-        with open(stampLocation + '/' + 'good' + k + '.txt', 'w') as csvfile:
-            w = csv.DictWriter(csvfile, fieldnames=header, delimiter=' ')
-            #w.writeheader()
-            for row in v:
-                w.writerow(row)
-    # So now let stampstorm do its stuff
-
-    if len(exposureList) > 0:
-        nProcessors, listChunks = splitList(exposureList, bins = stampThreads)
-
-        print("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
-        parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'good'], drainQueues = False)
-        print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
-
-    junkExpsDict = defaultdict(list)
-    for mjd in mjds:
-        junkExps = getJunk(conn, options.camera, int(mjd))
-        for exp in junkExps:
-            junkExpsDict[exp['obs']].append(exp)
-
-    exposureList = []
-    for k,v in junkExpsDict.items():
-        exposureList.append(k)
-        with open(stampLocation + '/' + 'bad' + k + '.txt', 'w') as csvfile:
-       	    w = csv.DictWriter(csvfile, fieldnames=header, delimiter=' ')
-            #w.writeheader()
-            for row in v:
-                w.writerow(row)
-
-    if len(exposureList) > 0:
-        nProcessors, listChunks = splitList(exposureList, bins = stampThreads)
-
-        print("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
-        parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'bad'], drainQueues = False)
-        print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
     
     conn.close()
-    getGoodBadFiles(stampLocation)
 
 if __name__=='__main__':
     main()
