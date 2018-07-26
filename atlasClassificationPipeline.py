@@ -2,6 +2,7 @@ import luigi
 from buildMLDataSet import buildMLDataSet
 from getATLASTrainingSetCutouts import getATLASTrainingSetCutouts
 from kerasTensorflowClassifier import kerasTensorflowClassifier
+from plotResults import plotResults
 
 defaultDir = '/export/raid/db4data1/scratch/amanda/hko'
 
@@ -81,7 +82,18 @@ class KerasTensorflowClassifier(luigi.Task):
         'classifierfile':self.classifierfile}
         kerasTensorflowClassifier(options)
         
+class PlotResults(luigi.Task):
+    inputFiles = luigi.ListParameter(default=[defaultDir+'/output.csv'])
+    outputFile = luigi.Parameter(default=defaultDir+'/plots.png')
 
+    def requires(self):
+        return [KerasTensorflowClassifier()]
+
+    def output(self):
+        return luigi.LocalTarget(self.outputFile)
+
+    def run(self):
+        plotResults(self.inputFiles, self.outputFile)
 
 if __name__ == '__main__':
     luigi.run()
