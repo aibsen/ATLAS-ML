@@ -21,8 +21,8 @@ Options:
 
 """
 import sys
-#__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
-#from docopt import docopt
+__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
+from docopt import docopt
 import os, MySQLdb, shutil, re, csv, subprocess
 from gkutils import Struct, cleanOptions, dbConnect, doRsync
 from datetime import datetime
@@ -163,26 +163,26 @@ def getGoodBadFiles(path):
                     bad.write(file+'\n')
     print("Generated good and bad files")
 
-def getATLASTrainingSetCutouts(options):
-#    opts = docopt(__doc__, version='0.1')
-#    opts = cleanOptions(opts)
-    #print(opts)
-    # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
-#    options = Struct(**opts)
-    print(options)
+
+def getATLASTrainingSetCutouts(opts):
+    if type(opts) is dict:
+        options = Struct(**opts)
+    else:
+        options = opts
+
     import yaml
-    with open(options['configFile']) as yaml_file:
+    with open(options.configFile) as yaml_file:
         config = yaml.load(yaml_file)
 
-    stampSize = int(options['stampSize'])
-    mjds = options['mjds']
+    stampSize = int(options.stampSize)
+    mjds = options.mjds
     if not mjds:
         print ("No MJDs specified")
         return 1
 
-    downloadThreads = int(options['downloadthreads'])
-    stampThreads = int(options['stampThreads'])
-    stampLocation = options['stampLocation']
+    downloadThreads = int(options.downloadthreads)
+    stampThreads = int(options.stampThreads)
+    stampLocation = options.stampLocation
     if not os.path.exists(stampLocation):
         os.makedirs(stampLocation)
     username = config['databases']['local']['username']
@@ -201,7 +201,7 @@ def getATLASTrainingSetCutouts(options):
 
     asteroidExpsDict = defaultdict(list)
     for mjd in mjds:
-        asteroidExps = getKnownAsteroids(conn, options['camera'], int(mjd), pkn = 900)
+        asteroidExps = getKnownAsteroids(conn, options.camera, int(mjd), pkn = 900)
         for exp in asteroidExps:
             asteroidExpsDict[exp['obs']].append(exp)
     
@@ -229,7 +229,7 @@ def getATLASTrainingSetCutouts(options):
 
     junkExpsDict = defaultdict(list)
     for mjd in mjds:
-        junkExps = getJunk(conn, options['camera'], int(mjd))
+        junkExps = getJunk(conn, options.camera, int(mjd))
         for exp in junkExps:
             junkExpsDict[exp['obs']].append(exp)
 
@@ -252,6 +252,16 @@ def getATLASTrainingSetCutouts(options):
     conn.close()
     getGoodBadFiles(stampLocation)
 
-#if __name__=='__main__':
-#    main()
+
+def main():
+    opts = docopt(__doc__, version='0.1')
+    opts = cleanOptions(opts)
+
+    # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
+    options = Struct(**opts)
+    getATLASTrainingSetCutouts(options)
+
+
+if __name__=='__main__':
+    main()
     
