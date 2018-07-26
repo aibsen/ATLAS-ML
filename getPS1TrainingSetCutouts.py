@@ -162,12 +162,12 @@ def getGoodBadFiles(path):
     print("Generated good and bad files")
 
 def writePS1GoodBadFiles(path, images):
-    with open(path+'/good.txt', 'a') as good:
+    with open(path+'/good.txt', 'w') as good:
         for file in images.good:
             good.write(file+'\n')
         
 
-    with open(path+'/bad.txt', 'a') as bad:
+    with open(path+'/bad.txt', 'w') as bad:
         for file in images.bad:
             bad.write(file+'\n')
     print("Generated good and bad files")
