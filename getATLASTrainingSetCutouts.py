@@ -154,11 +154,11 @@ def workerStampStorm(num, db, listFragment, dateAndTime, firstPass, miscParamete
 
 def getGoodBadFiles(path):
        
-    with open(path+'/good.txt', 'a') as good:
+    with open(path+'/good.txt', 'w') as good:
             for file in os.listdir(path+'/good'):
                     good.write(file+'\n')
 
-    with open(path+'/bad.txt', 'a') as bad:
+    with open(path+'/bad.txt', 'w') as bad:
             for file in os.listdir(path+'/bad'):
                     bad.write(file+'\n')
     print("Generated good and bad files")
