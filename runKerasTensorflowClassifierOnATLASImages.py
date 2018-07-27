@@ -13,7 +13,7 @@ Options:
   --hkoclassifier=<hkoclassifier>    HKO Classifier file.
   --mloclassifier=<mloclassifier>    MLO Classifier file.
   --outputsql=<outputsql>            Output file [default: /tmp/update_eyeball_scores.sql].
-  --imageroot=<imageroot>            Root location of the actual images [default: /localhost/images/].
+  --imageroot=<imageroot>            Root location of the actual images [default: /psdb3/images/].
 
 
 """
@@ -106,12 +106,13 @@ def getRBValues(imageFilenames, classifier):
     return objectDict
 
 
-def main():
-    opts = docopt(__doc__, version='0.1')
-    opts = cleanOptions(opts)
+def runKerasTensorflowClassifier(opts):
 
     # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
-    options = Struct(**opts)
+    if type(opts) is dict:
+        options = Struct(**opts)
+    else:
+        options = opts
 
     import yaml
     with open(options.configFile) as yaml_file:
@@ -189,6 +190,15 @@ def main():
             f.write("update atlas_diff_objects set zooniverse_score = %f where id = %s;\n" % (finalScoresSorted[k], k))
 
     conn.close()
+
+
+def main():
+    opts = docopt(__doc__, version='0.1')
+    opts = cleanOptions(opts)
+
+    # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
+    options = Struct(**opts)
+    runKerasTensorflowClassifier(options)
 
 
 if __name__=='__main__':

@@ -173,10 +173,13 @@ def writePS1GoodBadFiles(path, images):
     print("Generated good and bad files")
 
 
-def main(argv = None):
-    opts = docopt(__doc__, version='0.1')
-    opts = cleanOptions(opts)
-    options = Struct(**opts)
+
+def getPS1TrainingSetCutouts(opts):
+
+    if type(opts) is dict:
+        options = Struct(**opts)
+    else:
+        options = opts
 
     import yaml
     with open(options.configFile) as yaml_file:
@@ -203,9 +206,16 @@ def main(argv = None):
 
     writePS1GoodBadFiles(options.stampLocation, images)
 
-    
-    
     conn.close()
+
+
+def main():
+    opts = docopt(__doc__, version='0.1')
+    opts = cleanOptions(opts)
+    options = Struct(**opts)
+
+    getPS1TrainingSetCutouts(options)
+
 
 if __name__=='__main__':
     main()

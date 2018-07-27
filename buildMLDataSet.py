@@ -52,13 +52,16 @@ def bg_sub_signPreserveNorm(imageFile, path, extent, extension):
     return np.ravel(image - dilated, order="F")
     
 def generate_vectors(imageList, path, extent, normFunc, extension):
-    print(path)
+    print("PATH = ", path)
     m = len(imageList)
     X = np.ones((m, 4*extent*extent))
 
     for i,imageFile in enumerate(imageList):
         try:
-            vector = normFunc(imageFile, path+"good/", extent, extension)
+            if '/' in imageFile:
+                vector = normFunc(imageFile, "", extent, extension)
+            else:
+                vector = normFunc(imageFile, path+"good/", extent, extension)
         except IOError:
             try:
                 vector = normFunc(imageFile, path+"bad/", extent, extension)
@@ -182,46 +185,24 @@ def save_to_hdf5(X,y,train_files,testX,testy,test_files,outputFile):
     hf.close()
 
 
-def buildMLDataSet(options):
+def buildMLDataSet(opts):
+    from gkutils import Struct
+    if type(opts) is dict:
+        options = Struct(**opts)
+    else:
+        options = opts
+
     startTime = time.time()
-  #  parser = optparse.OptionParser("[!] usage: python build_data_set.py\n"+\
-  #                                 " -p <positive data file>\n"+\
-  #                                 " -o <output file>\n"+\
-  #                                 " -n <negative data file [optional]>\n"+\
-  #                                 " -e <extent [default=10]>\n"+\
-  #                                 " -E <extension [default=1]>\n"+\
-  #                                 " -s <skew factor [default=1]>\n"+\
-  #                                 " -r <augment training data with rotation [optional]>\n"
-  #                                 " -N <normalisation function [default=signPreserveNorm]>")
-
-  #  parser.add_option("-p", dest="posFile", type="string", \
-  #                    help="specify file listing positive examples")
-  #  parser.add_option("-n", dest="negFile", type="string", \
-  #                    help="specify file listing bogus examples [optional]")
-  #  parser.add_option("-o", dest="outputFile", type="string", \
-  #                    help="specify output file name")
-  #  parser.add_option("-e", dest="extent", type="int", \
-  #                    help="specify image size [default=10]")
-  #  parser.add_option("-E", dest="extension", type="int", \
-  #                    help="specify image extension [default=1]")
-  #  parser.add_option("-s", dest="skewFactor", type="int", \
-  #                    help="specify skew to negative examples [default=1]")
-  #  parser.add_option("-r", dest="rotate", action="store_true", \
-  #                    help="specify whether to augment training set with roatated examples [optional]")
-  #  parser.add_option("-N", dest="norm", type="string", \
-  #                    help="specify normalisation function to apply to data [default=signPreserveNorm]")
-
-   # (options, args) = parser.parse_args()
     
-    posFile = options['posFile']
-    negFile = options['negFile']
-    outputFile = options['outputFile']
-    extent = options['extent']
-    extension = options['extension']
-    skewFactor = options['skewFactor']
-    rotate = options['rotate']
+    posFile = options.posFile
+    negFile = options.negFile
+    outputFile = options.outputFile
+    extent = options.extent
+    extension = options.extension
+    skewFactor = options.skewFactor
+    rotate = options.rotate
     print(rotate)
-    norm = options['norm']
+    norm = options.norm
     
     if posFile == None or outputFile == None:
        # print(parser.usage)
@@ -298,5 +279,37 @@ def buildMLDataSet(options):
     print("[+] Processing complete.")
     print("[*] Run time: %d minutes." % ((time.time() - startTime) / 60))
     
-#if __name__ == "__main__":
-#    main()
+def main():
+    parser = optparse.OptionParser("[!] usage: python build_data_set.py\n"+\
+                                   " -p <positive data file>\n"+\
+                                   " -o <output file>\n"+\
+                                   " -n <negative data file [optional]>\n"+\
+                                   " -e <extent [default=10]>\n"+\
+                                   " -E <extension [default=1]>\n"+\
+                                   " -s <skew factor [default=1]>\n"+\
+                                   " -r <augment training data with rotation [optional]>\n"
+                                   " -N <normalisation function [default=signPreserveNorm]>")
+
+    parser.add_option("-p", dest="posFile", type="string", \
+                      help="specify file listing positive examples")
+    parser.add_option("-n", dest="negFile", type="string", \
+                      help="specify file listing bogus examples [optional]")
+    parser.add_option("-o", dest="outputFile", type="string", \
+                      help="specify output file name")
+    parser.add_option("-e", dest="extent", type="int", \
+                      help="specify image size [default=10]")
+    parser.add_option("-E", dest="extension", type="int", \
+                      help="specify image extension [default=1]")
+    parser.add_option("-s", dest="skewFactor", type="int", \
+                      help="specify skew to negative examples [default=1]")
+    parser.add_option("-r", dest="rotate", action="store_true", \
+                      help="specify whether to augment training set with roatated examples [optional]")
+    parser.add_option("-N", dest="norm", type="string", \
+                      help="specify normalisation function to apply to data [default=signPreserveNorm]")
+
+    (options, args) = parser.parse_args()
+
+    buildMLDataSet(options)
+
+if __name__ == "__main__":
+    main()
