@@ -47,7 +47,6 @@ def getGoodPS1Objects(conn, listId):
                and observation_status = 'mover'
                and confidence_factor is not null
                and (comment like 'EPH:%%' or comment like 'MPC:%%')
-             limit 100
         """, (listId,))
         resultSet = cursor.fetchall ()
 
@@ -59,7 +58,7 @@ def getGoodPS1Objects(conn, listId):
     return resultSet
 
 
-def getBadPS1Objects(conn, listId, rbThreshold = 0.1):
+def getBadPS1Objects(conn, listId, rbThreshold = 0.01):
     """
     Get "bad" objects
     """
@@ -74,7 +73,6 @@ def getBadPS1Objects(conn, listId, rbThreshold = 0.1):
              where confidence_factor < %s 
                and detection_list_id = %s
                and sherlockClassification is not null
-             limit 1000
         """, (rbThreshold, listId,))
         resultSet = cursor.fetchall ()
 
@@ -144,8 +142,11 @@ def getTrainingSetImages(conn, imageHome = '/psdb2/images/ps13pi/'):
             badImages.append(imageName)
 
     images = ImageSet()
-    images.good = goodImages
-    images.bad = badImages
+
+    # 2018-07-27 KWS Sort the images in reverse order (most recent at the top).
+    #                This should make reading the data from disk quicker.
+    images.good = goodImages.sort(reverse=True)
+    images.bad = badImages.sort(reverse=True)
 
     return images
 
