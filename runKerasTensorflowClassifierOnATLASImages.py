@@ -2,7 +2,7 @@
 """Run the Keras/Tensorflow classifier.
 
 Usage:
-  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--outputsql=<outputsql>] [--listid=<listid>] [--imageroot=<imageroot>]
+  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>]
   %s (-h | --help)
   %s --version
 
@@ -12,7 +12,7 @@ Options:
   --listid=<listid>                  List ID [default: 4].
   --hkoclassifier=<hkoclassifier>    HKO Classifier file.
   --mloclassifier=<mloclassifier>    MLO Classifier file.
-  --outputsql=<outputsql>            Output file [default: /tmp/update_eyeball_scores.sql].
+  --outputcsv=<outputcsv>            Output file [default: /tmp/update_eyeball_scores.csv].
   --imageroot=<imageroot>            Root location of the actual images [default: /psdb3/images/].
 
 
@@ -139,8 +139,9 @@ def runKerasTensorflowClassifier(opts):
     for row in imageFilenames:
         if '01a' in row['filename']:
             mloFilenames.append(row['filename'])
-
+    print("number of hko files : "+str(len(hkoFilenames)))
     #filename = 'hko_57966_20x20_skew3_signpreserve_f77475b232425.mat'
+    print("number of mlo files : "+str(len(mloFilenames)))
     #train_data, test_data, image_dim = load_data(filename)
     #x_test = test_data[0]
 
@@ -184,12 +185,18 @@ def runKerasTensorflowClassifier(opts):
     finalScoresSorted = OrderedDict(sorted(list(finalScores.items()), key=lambda t: t[1]))
 
     # Generate the insert statements
-    with open(options.outputsql, 'w') as f:
+    with open(options.outputcsv, 'w') as f:
         for k, v in list(finalScoresSorted.items()):
-            print((k, finalScoresSorted[k]))
-            f.write("update atlas_diff_objects set zooniverse_score = %f where id = %s;\n" % (finalScoresSorted[k], k))
+            print(1,k, finalScoresSorted[k])
+            f.write(str(k)+','+'1'+','+str(finalScoresSorted[k])+'\n')
 
     conn.close()
+   # with  open(options.outputcsv,"w") as csvFile:
+   #     writer = csv.writer(csvFile, delimiter=',')
+   #     for i in list(finalScoresSorted.items()):
+   #         print(str(i)+' '+str(1)+' ',str(finalScoresSorted[i]))
+   #         writer.writerow(str(i),str(1),str(finalScoresSorted[i]))
+
 
 
 def main():
