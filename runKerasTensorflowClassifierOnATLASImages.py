@@ -2,7 +2,7 @@
 """Run the Keras/Tensorflow classifier.
 
 Usage:
-  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputsql=<outputsql>] [--listid=<listid>] [--imageroot=<imageroot>]
+  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>]
   %s (-h | --help)
   %s --version
 
@@ -13,7 +13,7 @@ Options:
   --hkoclassifier=<hkoclassifier>    HKO Classifier file.
   --mloclassifier=<mloclassifier>    MLO Classifier file.
   --ps1classifier=<mloclassifier>    PS1 Classifier file. This option will cause the HKO and MLO classifiers to be ignored.
-  --outputsql=<outputsql>            Output file [default: /tmp/update_eyeball_scores.sql].
+  --outputcsv=<outputcsv>            Output file [default: /tmp/update_eyeball_scores.csv].
   --imageroot=<imageroot>            Root location of the actual images [default: /psdb3/images/].
 
 
@@ -42,7 +42,7 @@ def getImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps
                  where detection_list_id = %s
                    and confidence_factor is not null
               order by followup_id desc
-                 limit 1000
+                 limit 100
             """, (listId,))
         else:
             cursor.execute ("""
@@ -212,15 +212,18 @@ def runKerasTensorflowClassifier(opts):
     finalScoresSorted = OrderedDict(sorted(list(finalScores.items()), key=lambda t: t[1]))
 
     # Generate the insert statements
-    with open(options.outputsql, 'w') as f:
+    with open(options.outputcsv, 'w') as f:
         for k, v in list(finalScoresSorted.items()):
-            print((k, finalScoresSorted[k]))
-            if ps1Data:
-                f.write("update tcs_transient_objects set confidence_factor = %f where id = %s;\n" % (finalScoresSorted[k], k))
-            else:
-                f.write("update atlas_diff_objects set zooniverse_score = %f where id = %s;\n" % (finalScoresSorted[k], k))
+            print(1,k, finalScoresSorted[k])
+            f.write(str(k)+','+'1'+','+str(finalScoresSorted[k])+'\n')
 
     conn.close()
+   # with  open(options.outputcsv,"w") as csvFile:
+   #     writer = csv.writer(csvFile, delimiter=',')
+   #     for i in list(finalScoresSorted.items()):
+   #         print(str(i)+' '+str(1)+' ',str(finalScoresSorted[i]))
+   #         writer.writerow(str(i),str(1),str(finalScoresSorted[i]))
+
 
 
 def main():

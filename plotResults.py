@@ -24,17 +24,12 @@ def plotResults(files, outputfile):
 	for file in files:
 		data = pd.read_csv(file, names=['file', 'tag', 'prediction'])
 		y = data['tag']
-		#swap tags
-		y[y==0] = -1
-		y[y==1] = 0
-		y[y==-1]= 1
-		y = y.values
-		scores = data['prediction'].values
-		fpr,tpr,thresholds = roc_curve(y, scores, pos_label=0)
+		scores = data['prediction']
+		fpr,tpr,thresholds = roc_curve(y, scores, pos_label=1)
 		roc_auc = auc(fpr, tpr)	
 		mdr = 1-tpr
 		plot_tradeoff(mdr, fpr, tradeoff)
 		plot_roc(fpr,tpr,roc_auc,roc)
-	plt.savefig(outputfile)
+#	plt.savefig(outputfile)
 	plt.show()
 
