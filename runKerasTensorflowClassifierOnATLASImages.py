@@ -2,7 +2,7 @@
 """Run the Keras/Tensorflow classifier.
 
 Usage:
-  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--outputsql=<outputsql>] [--listid=<listid>] [--imageroot=<imageroot>]
+  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputsql=<outputsql>] [--listid=<listid>] [--imageroot=<imageroot>]
   %s (-h | --help)
   %s --version
 
@@ -12,6 +12,7 @@ Options:
   --listid=<listid>                  List ID [default: 4].
   --hkoclassifier=<hkoclassifier>    HKO Classifier file.
   --mloclassifier=<mloclassifier>    MLO Classifier file.
+  --ps1classifier=<mloclassifier>    PS1 Classifier file. This option will cause the HKO and MLO classifiers to be ignored.
   --outputsql=<outputsql>            Output file [default: /tmp/update_eyeball_scores.sql].
   --imageroot=<imageroot>            Root location of the actual images [default: /psdb3/images/].
 
@@ -27,18 +28,29 @@ import numpy as np
 from kerasTensorflowClassifier import create_model, load_data
 from collections import defaultdict, OrderedDict
 
-def getATLASImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/'):
+def getImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps1Data = False):
     # First get the candidates
     import MySQLdb
     try:
         cursor = conn.cursor (MySQLdb.cursors.DictCursor)
 
-        cursor.execute ("""
-            select id
-              from atlas_diff_objects
-             where detection_list_id = %s
-               and zooniverse_score is not null
-        """, (listId,))
+        if ps1Data:
+            imageRoot = '/psdb2/images/'
+            cursor.execute ("""
+                select id
+                  from tcs_transient_objects
+                 where detection_list_id = %s
+                   and confidence_factor is not null
+              order by followup_id desc
+                 limit 1000
+            """, (listId,))
+        else:
+            cursor.execute ("""
+                select id
+                  from atlas_diff_objects
+                 where detection_list_id = %s
+                   and zooniverse_score is not null
+            """, (listId,))
         resultSet = cursor.fetchall ()
 
 
@@ -72,7 +84,7 @@ def getATLASImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/
     return images
 
 
-def getRBValues(imageFilenames, classifier):
+def getRBValues(imageFilenames, classifier, extension = 0):
     num_classes = 2
     image_dim = 20
     numImages = len(imageFilenames)
@@ -81,7 +93,7 @@ def getRBValues(imageFilenames, classifier):
     # loop through and fill the above matrix, remembering to correctly scale the
     # raw pixels for the specified sparse filter.
     for j,imageFilename in enumerate(imageFilenames):
-        vector = np.nan_to_num(TargetImage(imageFilename, extension=0).signPreserveNorm())
+        vector = np.nan_to_num(TargetImage(imageFilename, extension=extension).signPreserveNorm())
         #print vector
         #print vector.shape
         images[j,:,:,0] += np.reshape(vector, (image_dim,image_dim), order="F")
@@ -128,58 +140,74 @@ def runKerasTensorflowClassifier(opts):
         print("Cannot connect to the database")
         return 1
 
-    imageFilenames = getATLASImageDataToCheck(conn, database, listId = int(options.listid), imageRoot=options.imageroot)
+    # 2018-07-31 KWS We have PS1 data. Don't bother with the HKO/MLO ATLAS data.
+    ps1Data = False
+    if options.ps1classifier:
+        ps1Data = True
 
-    # Split the images into HKO and MLO data so we can apply the HKO and MLO machines separately.
-    hkoFilenames = []
-    for row in imageFilenames:
-        if '02a' in row['filename']:
-            hkoFilenames.append(row['filename'])
-    mloFilenames = []
-    for row in imageFilenames:
-        if '01a' in row['filename']:
-            mloFilenames.append(row['filename'])
+    imageFilenames = getImageDataToCheck(conn, database, listId = int(options.listid), imageRoot=options.imageroot, ps1Data = ps1Data)
 
-    #filename = 'hko_57966_20x20_skew3_signpreserve_f77475b232425.mat'
-    #train_data, test_data, image_dim = load_data(filename)
-    #x_test = test_data[0]
+    if ps1Data:
+        objectDictPS1 = getRBValues([f['filename'] for f in imageFilenames], options.ps1classifier, extension = 1)
+        objectScores = defaultdict(dict)
+        for k, v in list(objectDictPS1.items()):
+            objectScores[k]['ps1'] = np.array(v)
+        finalScores = {}
 
-    #hkoClassifier = '/home/kws/keras/hko_57966_20x20_skew3_signpreserve_f77475b232425.model.best.hdf5'
-    #mloClassifier = '/home/kws/keras/atlas_mlo_57925_20x20_skew3_signpreserve_f331184b993662.model.best.hdf5'
+        objects = list(objectScores.keys())
+        for object in objects:
+            finalScores[object] = np.median(objectScores[object]['ps1'])
+    else:
+        # Split the images into HKO and MLO data so we can apply the HKO and MLO machines separately.
+        hkoFilenames = []
+        for row in imageFilenames:
+            if '02a' in row['filename']:
+                hkoFilenames.append(row['filename'])
+        mloFilenames = []
+        for row in imageFilenames:
+            if '01a' in row['filename']:
+                mloFilenames.append(row['filename'])
 
-    objectDictHKO = getRBValues(hkoFilenames, options.hkoclassifier)
-    objectDictMLO = getRBValues(mloFilenames, options.mloclassifier)
+        #filename = 'hko_57966_20x20_skew3_signpreserve_f77475b232425.mat'
+        #train_data, test_data, image_dim = load_data(filename)
+        #x_test = test_data[0]
 
-    # Now we have two dictionaries. Combine them.
+        #hkoClassifier = '/home/kws/keras/hko_57966_20x20_skew3_signpreserve_f77475b232425.model.best.hdf5'
+        #mloClassifier = '/home/kws/keras/atlas_mlo_57925_20x20_skew3_signpreserve_f331184b993662.model.best.hdf5'
 
-    objectScores = defaultdict(dict)
+        objectDictHKO = getRBValues(hkoFilenames, options.hkoclassifier)
+        objectDictMLO = getRBValues(mloFilenames, options.mloclassifier)
 
-    for k, v in list(objectDictHKO.items()):
-        objectScores[k]['hko'] = np.array(v)
-    for k, v in list(objectDictMLO.items()):
-        objectScores[k]['mlo'] = np.array(v)
+        # Now we have two dictionaries. Combine them.
 
-    # Some objects will have data from two telescopes, some only one.
-    # If we have data from two telescopes, choose the median value of the longest length list.
+        objectScores = defaultdict(dict)
 
-    finalScores = {}
+        for k, v in list(objectDictHKO.items()):
+            objectScores[k]['hko'] = np.array(v)
+        for k, v in list(objectDictMLO.items()):
+            objectScores[k]['mlo'] = np.array(v)
 
-    objects = list(objectScores.keys())
-    for object in objects:
-        if len(objectScores[object]) > 1:
-            hkoLen = len(objectScores[object]['hko'])
-            mloLen = len(objectScores[object]['mlo'])
-            if mloLen > hkoLen:
-                finalScores[object] = np.median(objectScores[object]['mlo'])
+        # Some objects will have data from two telescopes, some only one.
+        # If we have data from two telescopes, choose the median value of the longest length list.
+
+        finalScores = {}
+
+        objects = list(objectScores.keys())
+        for object in objects:
+            if len(objectScores[object]) > 1:
+                hkoLen = len(objectScores[object]['hko'])
+                mloLen = len(objectScores[object]['mlo'])
+                if mloLen > hkoLen:
+                    finalScores[object] = np.median(objectScores[object]['mlo'])
+                else:
+                    # Only if MLO is larger than HKO, use MLO. Otherise use HKO
+                    finalScores[object] = np.median(objectScores[object]['hko'])
+
             else:
-                # Only if MLO is larger than HKO, use MLO. Otherise use HKO
-                finalScores[object] = np.median(objectScores[object]['hko'])
-
-        else:
-            try:
-                finalScores[object] = np.median(objectScores[object]['hko'])
-            except KeyError as e:
-                finalScores[object] = np.median(objectScores[object]['mlo'])
+                try:
+                    finalScores[object] = np.median(objectScores[object]['hko'])
+                except KeyError as e:
+                    finalScores[object] = np.median(objectScores[object]['mlo'])
 
     finalScoresSorted = OrderedDict(sorted(list(finalScores.items()), key=lambda t: t[1]))
 
@@ -187,7 +215,10 @@ def runKerasTensorflowClassifier(opts):
     with open(options.outputsql, 'w') as f:
         for k, v in list(finalScoresSorted.items()):
             print((k, finalScoresSorted[k]))
-            f.write("update atlas_diff_objects set zooniverse_score = %f where id = %s;\n" % (finalScoresSorted[k], k))
+            if ps1Data:
+                f.write("update tcs_transient_objects set confidence_factor = %f where id = %s;\n" % (finalScoresSorted[k], k))
+            else:
+                f.write("update atlas_diff_objects set zooniverse_score = %f where id = %s;\n" % (finalScoresSorted[k], k))
 
     conn.close()
 
