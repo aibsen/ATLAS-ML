@@ -2,7 +2,6 @@
 Automatic classification of ATLAS objects
 
 ![alt text](/imgs/classification_pipeline.png)
-
 How does it work?
 
 -**getATLASTrainingSetCutouts.py**: It takes as input a config file, a list of dates (in MJD) and a directory to store the output in. It connects to the ATLAS database using the credentials in the config file and gets all exposures for the given time frame. For each exposure it creates a .txt file containing all x,y positions for the objects in the images and a 40x40 pixels cutout image for each object. It also creates a "good.txt" and a "bad.txt" file, containing the x,y positions for the real and 
