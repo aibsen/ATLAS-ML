@@ -1,10 +1,7 @@
 # ATLAS-ML
 Automatic classification of ATLAS objects
 
-To set up:
-
-- create virtual environment with python 3.6 and activate it
-- pip install -r requirements.txt
+![alt text](/imgs/classification_pipeline.png)
 
 How does it work?
 
@@ -18,4 +15,10 @@ bogus objects, respectively.
 -**kerasTensorflowClassifier.py**: It takes as input an .h5 file with the training set and a path to store a classifier as an .h5 file. If the model doesn't exist yet, it creates it, trains it and classifies a test set. It returns a .csv file containing  the targets and scores for all images.
 
 -**plotResults.py**: It takes as input a csv file with the scores and targets for all images and plots the ROC curve and the Detection error tradeoff graph for the data set.
+
+
+To set up:
+
+- create virtual environment with python 3.6 and activate it
+- pip install -r requirements.txt
 
