@@ -1,7 +1,7 @@
 # ATLAS-ML
 Automatic classification of ATLAS objects
 
-![alt text][https://github.com/aibsen/ATLAS-ML/blob/master/imgs/classification_pipeline.png]
+![alt text](/imgs/classification_pipeline.png)
 
 How does it work?
 
