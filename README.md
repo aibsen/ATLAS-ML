@@ -63,12 +63,12 @@ This repo contains a pipeline to connect to the [ATLAS](http://atlas.fallingstar
 When trying to run one task, the pipeline will search for the necessary resources to complete it and try to run it. If it doesn't find them, it'll run the task that's needed to produce those resources and will keep doing this recursively until it can run the task.
 
 ### To run a task:
-```python
+```
 python atlasClassificationPipeline.py Name_of_Task --local-scheduler --name_of_oition1 option1 ... --name_of_optionN optionN
 ```
 ### Examples:
 -To run the **PlotResults** task
-```python
+```
 python atlasClassificationPipeline.py PlotResults --local-scheduler --inputfiles [file1.csv,...,filen.csv] --outputFile output.png## How to run the pipeline?
 ```
 For more information on how to run a pipeline, go check the [luigi documentation](http://luigi.readthedocs.io/en/stable/running_luigi.html#)
