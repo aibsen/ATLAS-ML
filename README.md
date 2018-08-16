@@ -57,7 +57,12 @@ This repo contains a pipeline to connect to the [ATLAS](http://atlas.fallingstar
 #### Explanation
 -**plotResults.py**: It takes as input a csv file with the scores and targets for all images and plots the [ROC curve](https://en.wikipedia.org/wiki/Receiver_operating_characteristic) and the [Detection error tradeoff graph](https://en.wikipedia.org/wiki/Detection_error_tradeoff) for the data set.
 
+## Some results
 
+### ROC curve and trade-off plots for ATLAS test data-set
+![alt text](/imgs/roc_tradeoff.png)
+### Recall for 'confirmed' and 'good' transients
+![alt text](/imgs/recall_confirmed_and_good.png)
 ## How to run the pipeline?
 
 When trying to run one task, the pipeline will search for the necessary resources to complete it and try to run it. If it doesn't find them, it'll run the task that's needed to produce those resources and will keep doing this recursively until it can run the task.
