@@ -6,7 +6,7 @@ ddc files. Additionally, it currently does NOT attempt to download any missing e
 It assumes that all the required exposures are already downloaded.
 
 Usage:
-  %s <configFile> [<mjd>...] [--stampSize=<n>] [--stampLocation=<location>] [--test] [--downloadthreads=<threads>] [--stampThreads=<threads>] [--camera=<camera>]
+  %s <configFile> [<mjds>...] [--stampSize=<n>] [--stampLocation=<location>] [--test] [--downloadthreads=<threads>] [--stampThreads=<threads>] [--camera=<camera>]
   %s (-h | --help)
   %s --version
 
@@ -191,7 +191,7 @@ def getATLASTrainingSetCutouts(opts):
         config = yaml.load(yaml_file)
 
     stampSize = int(options.stampSize)
-    mjds = options.mjd
+    mjds = options.mjds
     if not mjds:
         print ("No MJDs specified")
         return 1

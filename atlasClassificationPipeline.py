@@ -4,6 +4,22 @@ from getATLASTrainingSetCutouts import getATLASTrainingSetCutouts
 from kerasTensorflowClassifier import kerasTensorflowClassifier
 from plotResults import plotResults
 
+"""
+Example command:
+
+python atlasClassificationPipeline.py PlotResults --local-scheduler \
+    --inputFiles '["/export/raid/db4data1/scratch/kws/training/atlas/pipeline_test/output_hko_58310.csv"]' \
+    --outputFile /export/raid/db4data1/scratch/kws/training/atlas/pipeline_test/output_hko_58310.png \
+    --GetCutOuts-mjds '[58310]' \
+    --GetCutOuts-configFile ~/config4_readonly.yaml \
+    --GetCutOuts-stampLocation /export/raid/db4data1/scratch/kws/training/atlas/pipeline_test \
+    --BuildMLDataSet-good /export/raid/db4data1/scratch/kws/training/atlas/pipeline_test/good.txt \
+    --BuildMLDataSet-bad /export/raid/db4data1/scratch/kws/training/atlas/pipeline_test/bad.txt \
+    --BuildMLDataSet-outputFile /export/raid/db4data1/scratch/kws/training/atlas/pipeline_test/58310_data.h5 \
+    --KerasTensorflowClassifier-classifierfile /export/raid/db4data1/scratch/kws/training/atlas/pipeline_test/58310_data_classifier.h5 \
+    --KerasTensorflowClassifier-outputcsv /export/raid/db4data1/scratch/kws/training/atlas/pipeline_test/output_hko_58310.csv
+"""
+
 defaultDir = '/export/raid/db4data1/scratch/amanda/hko'
 
 class GetCutOuts(luigi.Task):
