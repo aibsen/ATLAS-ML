@@ -2,7 +2,8 @@
 """Use "stampstorm04 to generate "good" and "bad" training set data for Machine Learning.
 Note that this code will generate "good" data from known asteroids, and "bad" data from
 everything else that has pvr and ptr = 0. This code only works on the database created from
-ddc files.
+ddc files. Additionally, it currently does NOT attempt to download any missing exposures.
+It assumes that all the required exposures are already downloaded.
 
 Usage:
   %s <configFile> [<mjd>...] [--stampSize=<n>] [--stampLocation=<location>] [--test] [--downloadthreads=<threads>] [--stampThreads=<threads>] [--camera=<camera>]
@@ -19,9 +20,11 @@ Options:
   --downloadthreads=<threads>  The number of threads (processes) to use [default: 5].
   --stampThreads=<threads>     The number of threads (processes) to use [default: 28].
 
+Example:
+  %s ~/config4_readonly.yaml 58362 --stampLocation=/export/raid/db4data1/scratch/kws/training/atlas/hko_58362o
 """
 import sys
-__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 from docopt import docopt
 import os, MySQLdb, shutil, re, csv, subprocess
 from gkutils import Struct, cleanOptions, dbConnect, doRsync
@@ -104,19 +107,29 @@ def stampStormWrapper(exposureList, stampSize, stampLocation, objectType='good')
         camera = exp[0:3]
         mjd = exp[3:8]
         imageName = '/atlas/diff/' + camera + '/' + mjd + '/' + exp + '.diff.fz'
-        inFile = stampLocation + '/' + objectType + exp + '.txt'
+        #inFile = stampLocation + '/' + objectType + exp + '.txt'
+        # The code changes directory to the one below where the text files have been generated.
+        # stampstorm04 can't deal with filenames longer than 80 characters, so use a relative
+        # directory filename instead
+        inFile = '../' + objectType + exp + '.txt'
 
         if objectType == 'good':
             goodDir = stampLocation+'/good'
             if not os.path.exists(goodDir):
                 print("creating"+goodDir)
-                os.makedirs(goodDir)
+                try:
+                    os.makedirs(goodDir)
+                except FileExistsError as e:
+                    pass
             os.chdir(goodDir)
 
         else:
             badDir = stampLocation+'/bad'
             if not os.path.exists(badDir):
-                os.makedirs(badDir)   
+                try:
+                    os.makedirs(badDir)   
+                except FileExistsError as e:
+                    pass
             os.chdir(badDir)
 
         p = subprocess.Popen([STAMPSTORM04, inFile, imageName, objectType, str(stampSize/2)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -152,14 +165,17 @@ def workerStampStorm(num, db, listFragment, dateAndTime, firstPass, miscParamete
     return 0 
 
 
+# 2018-09-04 KWS Make sure the tiles files do not get written into the good.txt and bad.txt files.
 def getGoodBadFiles(path):
        
     with open(path+'/good.txt', 'w') as good:
             for file in os.listdir(path+'/good'):
+                if 'tiles' not in file:
                     good.write(file+'\n')
 
     with open(path+'/bad.txt', 'w') as bad:
             for file in os.listdir(path+'/bad'):
+                if 'tiles' not in file:
                     bad.write(file+'\n')
     print("Generated good and bad files")
 
@@ -175,7 +191,7 @@ def getATLASTrainingSetCutouts(opts):
         config = yaml.load(yaml_file)
 
     stampSize = int(options.stampSize)
-    mjds = options.mjds
+    mjds = options.mjd
     if not mjds:
         print ("No MJDs specified")
         return 1
@@ -223,7 +239,7 @@ def getATLASTrainingSetCutouts(opts):
     if len(exposureList) > 0:
         nProcessors, listChunks = splitList(exposureList, bins = stampThreads)
 
-        print("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
+        print("%s Parallel Processing Good objects..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
         parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'good'], drainQueues = False)
         print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
 
@@ -245,7 +261,7 @@ def getATLASTrainingSetCutouts(opts):
     if len(exposureList) > 0:
         nProcessors, listChunks = splitList(exposureList, bins = stampThreads)
 
-        print("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
+        print("%s Parallel Processing Bad objects..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
         parallelProcess([], dateAndTime, nProcessors, listChunks, workerStampStorm, miscParameters = [stampSize, stampLocation, 'bad'], drainQueues = False)
         print("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
     
