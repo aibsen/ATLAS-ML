@@ -215,7 +215,7 @@ def runKerasTensorflowClassifier(opts):
     with open(options.outputcsv, 'w') as f:
         for k, v in list(finalScoresSorted.items()):
             print(1,k, finalScoresSorted[k])
-            f.write(str(k)+','+'1'+','+str(finalScoresSorted[k])+'\n')
+            f.write(str(k)+','+str(finalScoresSorted[k])+'\n')
 
     conn.close()
    # with  open(options.outputcsv,"w") as csvFile:
