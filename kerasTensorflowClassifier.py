@@ -78,7 +78,7 @@ def create_model(num_classes, image_dim):
     model.add(Dense(500, activation='relu'))
     model.add(Dropout(0.4))
     model.add(Dense(num_classes, activation='softmax'))
-    model.compile(loss='categorical_crossentropy', optimizer='adam', \
+    model.compile(loss='categorical_crossentropy', optimizer='sgd', \
                   kerasmetrics=['accuracy'])
     return model
 
