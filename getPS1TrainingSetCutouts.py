@@ -47,6 +47,9 @@ def getGoodPS1Objects(conn, listId):
                and observation_status = 'mover'
                and confidence_factor is not null
                and (comment like 'EPH:%%' or comment like 'MPC:%%')
+             union
+            select id from tcs_transient_objects
+             where detection_list_id = 2
         """, (listId,))
         resultSet = cursor.fetchall ()
 
@@ -58,7 +61,7 @@ def getGoodPS1Objects(conn, listId):
     return resultSet
 
 
-def getBadPS1Objects(conn, listId, rbThreshold = 0.01):
+def getBadPS1Objects(conn, listId, rbThreshold = 0.1):
     """
     Get "bad" objects
     """
@@ -120,6 +123,8 @@ def getTrainingSetImages(conn, imageHome = '/psdb2/images/ps13pi/'):
     class ImageSet:
         pass
 
+    imgs = ImageSet()
+
     goodImages = []
     for candidate in goodObjects:
         images = getImagesForObject(conn, candidate['id'])
@@ -128,6 +133,11 @@ def getTrainingSetImages(conn, imageHome = '/psdb2/images/ps13pi/'):
             mjd = image['image_filename'].split('_')[1].split('.')[0]
             imageName = imageHome+mjd+'/' + image['image_filename']+'.fits'
             goodImages.append(imageName)
+
+    # 2018-07-27 KWS Sort the images in reverse order (most recent at the top).
+    #                This should make reading the data from disk quicker.
+    goodImages.sort(reverse=True)
+    imgs.good = goodImages
 
     badObjects = getBadPS1Objects(conn, listId = 0)
     print("Number of bad objects = ", len(badObjects))
@@ -141,14 +151,11 @@ def getTrainingSetImages(conn, imageHome = '/psdb2/images/ps13pi/'):
             imageName = imageHome+mjd+'/' + image['image_filename']+'.fits'
             badImages.append(imageName)
 
-    images = ImageSet()
 
-    # 2018-07-27 KWS Sort the images in reverse order (most recent at the top).
-    #                This should make reading the data from disk quicker.
-    images.good = goodImages.sort(reverse=True)
-    images.bad = badImages.sort(reverse=True)
+    badImages.sort(reverse=True)
+    imgs.bad = badImages
 
-    return images
+    return imgs
 
 
 def getGoodBadFiles(path):

@@ -92,12 +92,12 @@ def plotROC(y_true, labels, *args):
     precision, recall, pr_thresholds, fpr, tpr, thresholds = plot_roc_curve(y_true, y)
     f = []
     m = []
-    for t in [0.01, 0.05, 0.1]:
+    for t in [0.01, 0.02, 0.03, 0.035, 0.04, 0.05, 0.1, 0.25]:
       print("")
-      print("[+] %.3lf%% fpr gives " % (int(t*100)) + str((1-tpr[np.where(fpr<=t)[0]][0])*100) + "% mdr")
+      print("[+] %.3lf%% fpr gives " % (t*100) + str((1-tpr[np.where(fpr<=t)[0]][0])*100) + "% mdr")
       print("   [+] threshold : %.3lf"%(thresholds[np.where(fpr<=t)[0]][0]))
       m.append(1-tpr[np.where(fpr<=t)[0]][0])
-      print("[+]%.3lf%% mdr gives " % (int(t*100)) + str(fpr[np.where(1-tpr<=t)[0]][-1]*100) + "% fpr")
+      print("[+]%.3lf%% mdr gives " % (t*100) + str(fpr[np.where(1-tpr<=t)[0]][-1]*100) + "% fpr")
       print("   [+] threshold : %.3lf"%(thresholds[np.where(1-tpr<=t)[0]][-1]))
       f.append(fpr[np.where(1-tpr<=t)[0]][-1])
     if labels[i] == "combined":

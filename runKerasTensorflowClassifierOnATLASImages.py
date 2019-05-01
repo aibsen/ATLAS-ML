@@ -42,7 +42,7 @@ def getImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps
                  where detection_list_id = %s
                    and confidence_factor is not null
               order by followup_id desc
-                 limit 100
+                -- limit 100
             """, (listId,))
         else:
             cursor.execute ("""
