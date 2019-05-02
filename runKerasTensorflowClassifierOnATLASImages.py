@@ -2,7 +2,7 @@
 """Run the Keras/Tensorflow classifier.
 
 Usage:
-  %s <configFile> [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>]
+  %s <configFile> [<candidate>...] [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>]
   %s (-h | --help)
   %s --version
 
@@ -16,10 +16,13 @@ Options:
   --outputcsv=<outputcsv>            Output file [default: /tmp/update_eyeball_scores.csv].
   --imageroot=<imageroot>            Root location of the actual images [default: /psdb3/images/].
 
+Example:
+  python %s ~/config.pso3.gw.warp.yaml --ps1classifier=/data/db4data1/scratch/kws/training/ps1/20190115/ps1_20190115_400000_1200000.best.hdf5 --listid=4 --outputcsv=/tmp/pso3_list_4.csv
+  python %s ../ps13pi/config/config.yaml --ps1classifier=/data/db4data1/scratch/kws/training/ps1/20190115/ps1_20190115_400000_1200000.best.hdf5 --listid=4 --outputcsv=/tmp/ps13pi_list_4.csv
 
 """
 import sys
-__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 from docopt import docopt
 from gkutils import Struct, cleanOptions, readGenericDataFile, dbConnect
 import sys, csv, os
@@ -28,14 +31,13 @@ import numpy as np
 from kerasTensorflowClassifier import create_model, load_data
 from collections import defaultdict, OrderedDict
 
-def getImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps1Data = False):
+def getObjectsByList(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps1Data = False):
     # First get the candidates
     import MySQLdb
     try:
         cursor = conn.cursor (MySQLdb.cursors.DictCursor)
 
         if ps1Data:
-            imageRoot = '/psdb2/images/'
             cursor.execute ("""
                 select id
                   from tcs_transient_objects
@@ -52,14 +54,23 @@ def getImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps
                    and zooniverse_score is not null
             """, (listId,))
         resultSet = cursor.fetchall ()
+        cursor.close ()
 
 
     except MySQLdb.Error as e:
         print("Error %d: %s" % (e.args[0], e.args[1]))
 
+    return resultSet
+
+# 2019-05-02 KWS Separated out the acquisiton of images so that can do
+#                this multithreaded. Also so we can pass a user defined
+#                list of objects to the processing.
+
+def getImages(conn, dbName, objectList, imageRoot='/psdb3/images/'):
+    import MySQLdb
     images = []
     # Now, for each candidate, get the image
-    for row in resultSet:
+    for row in objectList:
         try:
             cursor = conn.cursor (MySQLdb.cursors.DictCursor)
             cursor.execute ("""
@@ -84,6 +95,7 @@ def getImageDataToCheck(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps
     return images
 
 
+
 def getRBValues(imageFilenames, classifier, extension = 0):
     num_classes = 2
     image_dim = 20
@@ -105,7 +117,6 @@ def getRBValues(imageFilenames, classifier, extension = 0):
     model.load_weights(classifier)
 
     pred = model.predict(images, verbose=0)
-    print(pred)
     # Collect the predictions from all the files, but aggregate into objects
     objectDict = defaultdict(list)
     for i in range(len(pred[:,1])):
@@ -118,7 +129,7 @@ def getRBValues(imageFilenames, classifier, extension = 0):
     return objectDict
 
 
-def runKerasTensorflowClassifier(opts):
+def runKerasTensorflowClassifier(opts, processNumber = None):
 
     # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
     if type(opts) is dict:
@@ -145,7 +156,30 @@ def runKerasTensorflowClassifier(opts):
     if options.ps1classifier:
         ps1Data = True
 
-    imageFilenames = getImageDataToCheck(conn, database, listId = int(options.listid), imageRoot=options.imageroot, ps1Data = ps1Data)
+    if options.listid is not None:
+        try:
+            detectionList = int(options.listid)
+            if detectionList < 0 or detectionList > 8:
+                print ("Detection list must be between 0 and 8")
+                return 1
+        except ValueError as e:
+            sys.exit("Detection list must be an integer")
+
+    objectList = []
+    imageFilenames = []
+
+    # if candidates are specified in the options, then override the list.
+    if len(options.candidate) > 0:
+        objectList = [{'id': int(candidate)} for candidate in options.candidate]
+    else:
+        # Only collect by the list ID if we are running in single threaded mode
+        if processNumber is None:
+            objectList = getObjectsByList(conn, database, listId = int(options.listid), ps1Data = ps1Data)
+
+    if len(objectList) > 0:
+        imageFilenames = getImages(conn, database, objectList, imageRoot=options.imageroot)
+        if len(imageFilenames) == 0:
+            print("NO IMAGES")
 
     if ps1Data:
         objectDictPS1 = getRBValues([f['filename'] for f in imageFilenames], options.ps1classifier, extension = 1)
@@ -211,11 +245,25 @@ def runKerasTensorflowClassifier(opts):
 
     finalScoresSorted = OrderedDict(sorted(list(finalScores.items()), key=lambda t: t[1]))
 
+    prefix = options.outputcsv.split('.')[0]
+    suffix = options.outputcsv.split('.')[-1]
+
+    if suffix == prefix:
+        suffix = ''
+
+    if suffix:
+        suffix = '.' + suffix
+
+    processSuffix = ''
+
+    if processNumber is not None:
+        processSuffix = '_%02d' % processNumber
+
     # Generate the insert statements
-    with open(options.outputcsv, 'w') as f:
+    with open('%s%s%s' % (prefix, processSuffix, suffix), 'w') as f:
         for k, v in list(finalScoresSorted.items()):
-            print(1,k, finalScoresSorted[k])
-            f.write(str(k)+','+'1'+','+str(finalScoresSorted[k])+'\n')
+            print(k, finalScoresSorted[k])
+            f.write('%s,%f\n' % (k, finalScoresSorted[k]))
 
     conn.close()
    # with  open(options.outputcsv,"w") as csvFile:
@@ -224,6 +272,9 @@ def runKerasTensorflowClassifier(opts):
    #         print(str(i)+' '+str(1)+' ',str(finalScoresSorted[i]))
    #         writer.writerow(str(i),str(1),str(finalScoresSorted[i]))
 
+
+    scores = list(finalScoresSorted.items())
+    return scores
 
 
 def main():

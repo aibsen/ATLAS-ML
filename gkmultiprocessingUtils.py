@@ -1,32 +1,56 @@
 import multiprocessing, queue, sys, os, time, datetime, logging
 
 # 2013-07-31 KWS Allow overriding of number of processors (e.g. to use less than the CPU count)
-def splitList(objectsForUpdate, bins = None):
+# 2018-10-01 KWS Completely rewrote this function. We can now split the list
+#                in round robin manner or preserve the order in each sublist.
+#                If preserveOrder is False, append the objects in round robin
+#                order, otherwise append to each sublist the objects in list
+#                order.
+def splitList(objectsForUpdate, bins = None, preserveOrder = False):
 
    # Break the list of candidates up into the number of CPUs
    listLength = len(objectsForUpdate)
 
-   if bins and bins <= 32:
+   if bins and bins <= 256:
       nProcessors = bins
    else:
-      nProcessors = multiprocessing.cpu_count() 
+      nProcessors = multiprocessing.cpu_count()
 
-   if listLength < nProcessors:
+   if listLength <= nProcessors:
       nProcessors = listLength
 
-   listChunks = []
 
-   listChunkSize = int(round((listLength * 1.0) / nProcessors))
+   # Create nProcessors x empty arrays
+   listChunks = [ [] for i in range(nProcessors) ]
 
    i = 0
-   if nProcessors > 1:
-      for i in range(nProcessors-1):
-         listChunks.append(objectsForUpdate[i*listChunkSize:i*listChunkSize+listChunkSize])
 
-      # Append the last (probably uneven) chunk.  Might have 1 extra or 1 fewer members.
-      listChunks.append(objectsForUpdate[(i+1)*listChunkSize:])
+   if preserveOrder:
+      # work out the remainder
+      remainder = listLength % nProcessors
+      chunkSize = listLength / nProcessors
+
+      ch = 0
+      for item in objectsForUpdate:
+         listChunks[i].append(item)
+         ch += 1
+         if remainder > 0:
+             rem = 1
+         else:
+             rem = 0
+
+         if ch >= chunkSize + rem:
+            i += 1
+            ch = 0
+
+            if remainder > 0:
+               remainder -= 1
    else:
-      listChunks.append(objectsForUpdate)
+      for item in objectsForUpdate:
+         listChunks[i].append(item)
+         i += 1
+         if i >= nProcessors:
+            i = 0
 
    return nProcessors, listChunks
 
