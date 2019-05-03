@@ -2,7 +2,7 @@
 """Run the Keras/Tensorflow classifier.
 
 Usage:
-  %s <configFile> [<candidate>...] [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>]
+  %s <configFile> [<candidate>...] [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>] [--update]
   %s (-h | --help)
   %s --version
 
@@ -13,8 +13,9 @@ Options:
   --hkoclassifier=<hkoclassifier>    HKO Classifier file.
   --mloclassifier=<mloclassifier>    MLO Classifier file.
   --ps1classifier=<mloclassifier>    PS1 Classifier file. This option will cause the HKO and MLO classifiers to be ignored.
-  --outputcsv=<outputcsv>            Output file [default: /tmp/update_eyeball_scores.csv].
+  --outputcsv=<outputcsv>            Output file.
   --imageroot=<imageroot>            Root location of the actual images [default: /psdb3/images/].
+  --update                           Update the database.
 
 Example:
   python %s ~/config.pso3.gw.warp.yaml --ps1classifier=/data/db4data1/scratch/kws/training/ps1/20190115/ps1_20190115_400000_1200000.best.hdf5 --listid=4 --outputcsv=/tmp/pso3_list_4.csv
@@ -26,7 +27,7 @@ __doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.arg
 from docopt import docopt
 from gkutils import Struct, cleanOptions, readGenericDataFile, dbConnect
 import sys, csv, os
-from runKerasTensorflowClassifierOnATLASImages import getObjectsByList, runKerasTensorflowClassifier
+from runKerasTensorflowClassifierOnATLASImages import getObjectsByList, runKerasTensorflowClassifier, updateTransientRBValue
 from gkmultiprocessingUtils import *
 
 LOG_FILE_LOCATION = '/' + os.uname()[1].split('.')[0] + '/tc_logs/'
@@ -125,11 +126,15 @@ def runKerasTensorflowClassifierMultiprocess(opts):
     # Sort the combined list.
     objectsForUpdate = sorted(objectsForUpdate, key = lambda x: x[1])
 
-    # Generate the insert statements
-    with open(options.outputcsv, 'w') as f:
+    if options.outputcsv is not None:
+        with open(options.outputcsv, 'w') as f:
+            for row in objectsForUpdate:
+                print(row[0], row[1])
+                f.write('%s,%f\n' % (row[0], row[1]))
+
+    if options.update:
         for row in objectsForUpdate:
-            print(row[0], row[1])
-            f.write('%s,%f\n' % (row[0], row[1]))
+            updateTransientRBValue(conn, row[0], row[1], ps1Data = ps1Data)
 
     conn.close()
 

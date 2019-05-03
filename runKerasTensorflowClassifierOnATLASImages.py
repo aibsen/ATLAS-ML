@@ -2,7 +2,7 @@
 """Run the Keras/Tensorflow classifier.
 
 Usage:
-  %s <configFile> [<candidate>...] [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>]
+  %s <configFile> [<candidate>...] [--hkoclassifier=<hkoclassifier>] [--mloclassifier=<mloclassifier>] [--ps1classifier=<ps1classifier>] [--outputcsv=<outputcsv>] [--listid=<listid>] [--imageroot=<imageroot>] [--update]
   %s (-h | --help)
   %s --version
 
@@ -13,8 +13,9 @@ Options:
   --hkoclassifier=<hkoclassifier>    HKO Classifier file.
   --mloclassifier=<mloclassifier>    MLO Classifier file.
   --ps1classifier=<mloclassifier>    PS1 Classifier file. This option will cause the HKO and MLO classifiers to be ignored.
-  --outputcsv=<outputcsv>            Output file [default: /tmp/update_eyeball_scores.csv].
+  --outputcsv=<outputcsv>            Output file.
   --imageroot=<imageroot>            Root location of the actual images [default: /psdb3/images/].
+  --update                           Update the database.
 
 Example:
   python %s ~/config.pso3.gw.warp.yaml --ps1classifier=/data/db4data1/scratch/kws/training/ps1/20190115/ps1_20190115_400000_1200000.best.hdf5 --listid=4 --outputcsv=/tmp/pso3_list_4.csv
@@ -42,7 +43,8 @@ def getObjectsByList(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps1Da
                 select id
                   from tcs_transient_objects
                  where detection_list_id = %s
-                   and confidence_factor is not null
+                   and confidence_factor is null
+                   and tcs_images_id is not null
               order by followup_id desc
                 -- limit 100
             """, (listId,))
@@ -51,7 +53,8 @@ def getObjectsByList(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps1Da
                 select id
                   from atlas_diff_objects
                  where detection_list_id = %s
-                   and zooniverse_score is not null
+                   and zooniverse_score is null
+                   and images_id is not null
             """, (listId,))
         resultSet = cursor.fetchall ()
         cursor.close ()
@@ -94,6 +97,43 @@ def getImages(conn, dbName, objectList, imageRoot='/psdb3/images/'):
 
     return images
 
+# Update the database.
+def updateTransientRBValue(conn, objectId, realBogusValue, ps1Data = False):
+    import MySQLdb
+
+    rowsUpdated = 0
+
+    try:
+        cursor = conn.cursor(MySQLdb.cursors.DictCursor)
+
+        if ps1Data:
+            # It's Pan-STARRS data
+            cursor.execute ("""
+                 update tcs_transient_objects
+                 set confidence_factor = %s
+                 where id = %s
+            """, (realBogusValue, objectId))
+        else:
+            # It's ATLAS data
+            cursor.execute ("""
+                 update atlas_diff_objects
+                 set zooniverse_score = %s
+                 where id = %s
+            """, (realBogusValue, objectId))
+
+        rowsUpdated = cursor.rowcount
+
+        # Did we update any transient object rows? If not issue a warning.
+        if rowsUpdated == 0:
+            print ("WARNING: No transient object entries were updated.")
+
+        cursor.close ()
+
+
+    except MySQLdb.Error as e:
+        print ("Error %d: %s" % (e.args[0], e.args[1]))
+
+    return rowsUpdated
 
 
 def getRBValues(imageFilenames, classifier, extension = 0):
@@ -245,35 +285,37 @@ def runKerasTensorflowClassifier(opts, processNumber = None):
 
     finalScoresSorted = OrderedDict(sorted(list(finalScores.items()), key=lambda t: t[1]))
 
-    prefix = options.outputcsv.split('.')[0]
-    suffix = options.outputcsv.split('.')[-1]
+    if options.outputcsv is not None:
+        prefix = options.outputcsv.split('.')[0]
+        suffix = options.outputcsv.split('.')[-1]
 
-    if suffix == prefix:
-        suffix = ''
+        if suffix == prefix:
+            suffix = ''
 
-    if suffix:
-        suffix = '.' + suffix
+        if suffix:
+            suffix = '.' + suffix
 
-    processSuffix = ''
+        processSuffix = ''
 
-    if processNumber is not None:
-        processSuffix = '_%02d' % processNumber
+        if processNumber is not None:
+            processSuffix = '_%02d' % processNumber
 
-    # Generate the insert statements
-    with open('%s%s%s' % (prefix, processSuffix, suffix), 'w') as f:
-        for k, v in list(finalScoresSorted.items()):
-            print(k, finalScoresSorted[k])
-            f.write('%s,%f\n' % (k, finalScoresSorted[k]))
-
-    conn.close()
-   # with  open(options.outputcsv,"w") as csvFile:
-   #     writer = csv.writer(csvFile, delimiter=',')
-   #     for i in list(finalScoresSorted.items()):
-   #         print(str(i)+' '+str(1)+' ',str(finalScoresSorted[i]))
-   #         writer.writerow(str(i),str(1),str(finalScoresSorted[i]))
-
+        # Generate the insert statements
+        with open('%s%s%s' % (prefix, processSuffix, suffix), 'w') as f:
+            for k, v in list(finalScoresSorted.items()):
+                print(k, finalScoresSorted[k])
+                f.write('%s,%f\n' % (k, finalScoresSorted[k]))
 
     scores = list(finalScoresSorted.items())
+
+    if options.update and processNumber is None:
+        # Only allow database updates in single threaded mode. Otherwise multithreaded code
+        # does the updates at the end of processing. (Minimises table locks.)
+        for row in scores:
+            updateTransientRBValue(conn, row[0], row[1], ps1Data = ps1Data)
+
+    conn.close()
+
     return scores
 
 
@@ -283,8 +325,7 @@ def main():
 
     # Use utils.Struct to convert the dict into an object for compatibility with old optparse code.
     options = Struct(**opts)
-    runKerasTensorflowClassifier(options)
-
+    objectsForUpdate = runKerasTensorflowClassifier(options)
 
 if __name__=='__main__':
     main()
