@@ -32,6 +32,11 @@ import numpy as np
 from kerasTensorflowClassifier import create_model, load_data
 from collections import defaultdict, OrderedDict
 
+# 2019-05-05 KWS Limit the number of CPUs to 4 for each process. Should still overuse the CPUs
+#                but should get away with this because of I/O.
+#from keras import backend as K
+#K.set_session(K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=16, inter_op_parallelism_threads=16)))
+
 def getObjectsByList(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps1Data = False):
     # First get the candidates
     import MySQLdb
@@ -46,7 +51,6 @@ def getObjectsByList(conn, dbName, listId = 4, imageRoot='/psdb3/images/', ps1Da
                    and confidence_factor is null
                    and tcs_images_id is not null
               order by followup_id desc
-                -- limit 100
             """, (listId,))
         else:
             cursor.execute ("""
