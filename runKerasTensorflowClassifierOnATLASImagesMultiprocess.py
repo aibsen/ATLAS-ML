@@ -102,39 +102,47 @@ def runKerasTensorflowClassifierMultiprocess(opts):
     else:
         objectList = getObjectsByList(conn, database, listId = int(options.listid), ps1Data = ps1Data)
 
-#    for row in objectList:
-#        print (row['id'])
 
-    currentDate = datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")
-    (year, month, day, hour, min, sec) = currentDate.split(':')
-    dateAndTime = "%s%s%s_%s%s%s" % (year, month, day, hour, min, sec)
+    # 2019-06-07 KWS For reasons not entirely clear, Tensorflow seems to exhaust every last
+    #                bit of CPU and memory.  So let's divide the list by 10 if the list is
+    #                larger than 10000 in size.
 
-    objectsForUpdate = []
+    if len(objectList) > 1000:
+        bin, subLists = splitList(objectList, bins=20)
+    else:
+        subLists = [objectList]
 
-    if len(objectList) > 0:
-        nProcessors, listChunks = splitList(objectList)
+    for l in subLists:
+        currentDate = datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")
+        (year, month, day, hour, min, sec) = currentDate.split(':')
+        dateAndTime = "%s%s%s_%s%s%s" % (year, month, day, hour, min, sec)
 
-        print ("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
-        objectsForUpdate = parallelProcess(db, dateAndTime, nProcessors, listChunks, worker, miscParameters = [options])
-        print ("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
+        objectsForUpdate = []
 
-        print ("TOTAL OBJECTS TO UPDATE = %d" % len(objectsForUpdate))
+        if len(objectList) > 0:
+            nProcessors, listChunks = splitList(l)
 
-#    if len(objectsForUpdate) > 0 and options.update:
-#        updateObjects(conn, objectsForUpdate)
+            print ("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
+            objectsForUpdate = parallelProcess(db, dateAndTime, nProcessors, listChunks, worker, miscParameters = [options])
+            print ("%s Done Parallel Processing" % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
 
-    # Sort the combined list.
-    objectsForUpdate = sorted(objectsForUpdate, key = lambda x: x[1])
+            print ("TOTAL OBJECTS TO UPDATE = %d" % len(objectsForUpdate))
 
-    if options.outputcsv is not None:
-        with open(options.outputcsv, 'w') as f:
+    #    if len(objectsForUpdate) > 0 and options.update:
+    #        updateObjects(conn, objectsForUpdate)
+
+        # Sort the combined list.
+        objectsForUpdate = sorted(objectsForUpdate, key = lambda x: x[1])
+
+        if options.outputcsv is not None:
+            with open(options.outputcsv, 'w') as f:
+                for row in objectsForUpdate:
+                    print(row[0], row[1])
+                    f.write('%s,%f\n' % (row[0], row[1]))
+
+        if options.update:
             for row in objectsForUpdate:
-                print(row[0], row[1])
-                f.write('%s,%f\n' % (row[0], row[1]))
-
-    if options.update:
-        for row in objectsForUpdate:
-            updateTransientRBValue(conn, row[0], row[1], ps1Data = ps1Data)
+                updateTransientRBValue(conn, row[0], row[1], ps1Data = ps1Data)
 
     conn.close()
 
