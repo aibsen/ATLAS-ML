@@ -107,8 +107,8 @@ def runKerasTensorflowClassifierMultiprocess(opts):
     #                bit of CPU and memory.  So let's divide the list by 10 if the list is
     #                larger than 10000 in size.
 
-    if len(objectList) > 1000:
-        bin, subLists = splitList(objectList, bins=20)
+    if len(objectList) > 100:
+        bin, subLists = splitList(objectList, bins=16)
     else:
         subLists = [objectList]
 
@@ -120,7 +120,8 @@ def runKerasTensorflowClassifierMultiprocess(opts):
         objectsForUpdate = []
 
         if len(objectList) > 0:
-            nProcessors, listChunks = splitList(l)
+            # 2019-08-24 KWS Hard-wire the number of workers.
+            nProcessors, listChunks = splitList(l, bins=28)
 
             print ("%s Parallel Processing..." % (datetime.datetime.now().strftime("%Y:%m:%d:%H:%M:%S")))
             objectsForUpdate = parallelProcess(db, dateAndTime, nProcessors, listChunks, worker, miscParameters = [options])

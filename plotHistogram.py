@@ -2,7 +2,7 @@
 """Plot histogram to show performance of the specified trained classifier.
 
 Usage:
-  %s <classifierFile> [--outputFile=<file>]
+  %s <classifierFile> [--outputFile=<file>] [--threshold=<threshold>] [--log]
   %s (-h | --help)
   %s --version
 
@@ -10,6 +10,8 @@ Options:
   -h --help                    Show this screen.
   --version                    Show version.
   --outputFile=<file>          Output file. If not defined, show plot.
+  --threshold=<threshold>      Threshold at which the classifier is in use. Plots a dotted line on the histogram.
+  --log                        Plot log(y) instead of y.
 
 """
 import sys
@@ -21,7 +23,21 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 import numpy as n
 
-def plotHistogram(dataSeries):
+SMALL_SIZE = 14
+MEDIUM_SIZE = 18
+BIGGER_SIZE = 25
+TINY_SIZE = 12
+plt.rc('font', size=SMALL_SIZE)                   # controls default text sizes
+plt.rc('axes', titlesize=MEDIUM_SIZE)            # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)           # fontsize of the x and y labels
+plt.rc('xtick', labelsize=TINY_SIZE)            # fontsize of the tick labels
+plt.rc('ytick', labelsize=TINY_SIZE)            # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE - 1)               # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)   # fontsize of the figure title
+plt.rcParams["font.family"] = "serif"
+plt.rcParams['mathtext.fontset'] = 'dejavuserif'
+
+def plotHistogram(dataSeries, threshold = None, outputFile = None, logY = False):
 
     lenSeries0 = len(dataSeries[0])
     lenSeries1 = len(dataSeries[1])
@@ -29,18 +45,18 @@ def plotHistogram(dataSeries):
 
     ax1 = fig.add_subplot(111)
 
-    bins = n.linspace(0.0,1.0,200)
+    bins = n.linspace(0.0,1.0,41)
 
-    ml = MultipleLocator(1.0)
+    ml = MultipleLocator(0.1)
     ax1.xaxis.set_major_locator(ml)
 
     ax1 = fig.add_subplot(111)
-    ax1.hist(n.array(dataSeries[0]), bins=bins, color = 'r', label = "Bad", linewidth=1.0, alpha = 0.5)
+    ax1.hist(n.array(dataSeries[0]), bins=bins, color = 'r', label = "bogus", edgecolor='black', linewidth=0.5, alpha = 0.5)
     ax1.set_ylabel('Number of Objects')
     for tl in ax1.get_yticklabels():
-        tl.set_color('b')
+        tl.set_color('k')
 
-    ax1.hist(dataSeries[1], bins=bins, color='g', label = "Good", linewidth=1.0, alpha = 0.5)
+    ax1.hist(dataSeries[1], bins=bins, color='g', label = "real", edgecolor='black', linewidth=0.5, alpha = 0.8)
 
     ax1.set_xlabel('Realbogus Factor')
     #ax1.set_title('Classifier performance.')
@@ -48,12 +64,20 @@ def plotHistogram(dataSeries):
     ml = MultipleLocator(0.2)
     ax1.xaxis.set_minor_locator(ml)
     ax1.get_xaxis().set_tick_params(which='both', direction='out')
-    #ax1.set_xlim(0.0, 3.0)
     ax1.set_xlim(0.0, 1.0)
-    ax1.set_ylim(0.0, 6000.0)
 
-    plt.show()
-    #plt.savefig(filename + '.png', dpi=600)
+    if logY:
+        ax1.set_yscale('log')
+
+    if threshold is not None:
+        ax1.axvline(x=float(threshold),color='k',linestyle='--')
+
+    plt.tight_layout()
+
+    if outputFile is not None:
+        plt.savefig(outputFile)
+    else:
+        plt.show()
 
 
 def doPlots(options):
@@ -67,7 +91,7 @@ def doPlots(options):
         elif row['label'] == '0':
             bads.append(float(row['score']))
 
-    plotHistogram([bads, goods])
+    plotHistogram([bads, goods], threshold = options.threshold, outputFile = options.outputFile, logY = options.log)
 
 
 def main():
