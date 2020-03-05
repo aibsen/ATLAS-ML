@@ -9,7 +9,7 @@ Usage:
 Options:
   -h --help                    Show this screen.
   --version                    Show version.
-  --column=<column>            Column to plot [default: disc_mag]
+  --column=<column>            Column to plot. Use comma separation, no spaces if more than one [default: disc_mag]
   --outputFile=<file>          Output file. If not defined, show plot.
   --threshold=<threshold>      Threshold at which the classifier is in use. Plots a dotted line on the histogram.
   --xlabel=<xlabel>            x label [default: ]
@@ -22,8 +22,8 @@ Options:
   --majorticks=<majorticks>    major ticks [default: 1.0]
   --minorticks=<minorticks>    minor ticks [default: 0.1]
   --ylimit=<ylimit>            hard wired y limit
-  --colour=<colour>            use a single colour
-  --alpha=<alpha>              transparency setting [default: 0.5]
+  --colour=<colour>            Specify colour or more than one colour separated commas with no spaces. [default: orange,cyan]
+  --alpha=<alpha>              transparency setting - comma separated no spaces if more than one alpha [default: 0.5]
   --log                        Plot log(y) instead of y.
 """
 import sys
@@ -34,8 +34,6 @@ from gkutils import Struct, cleanOptions, readGenericDataFile
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 import numpy as n
-
-colours = ['orange', 'cyan']
 
 SMALL_SIZE = 14
 MEDIUM_SIZE = 18
@@ -53,6 +51,10 @@ plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 
 def plotHistogram(data, options):
 
+    colours = options.colour.split(',')
+    alphas = options.alpha.split(',')
+    columns = options.column.split(',')
+    #fig = plt.figure(figsize=(6,3))
     fig = plt.figure()
 
     ax1 = fig.add_subplot(111)
@@ -67,11 +69,17 @@ def plotHistogram(data, options):
     # May have more than one histogram to plot
     i = 0
     for d in data:
-        if options.colour:
-            colour = options.colour
+        if len(colours) == 1:
+            colour = colours[0]
         else:
             colour = colours[i]
-        ax1.hist(n.array(d), bins=bins, color = colour, edgecolor='black', linewidth=0.5, alpha = float(options.alpha))
+
+        if len(alphas) == 1:
+            alpha = alphas[0]
+        else:
+            alpha = alphas[i]
+
+        ax1.hist(n.array(d), bins=bins, color = colour, edgecolor='black', linewidth=0.5, alpha = float(alpha))
         i += 1
 
     ax1.set_ylabel(options.ylabel)
@@ -80,7 +88,8 @@ def plotHistogram(data, options):
 
     ax1.set_xlabel(options.xlabel)
     #ax1.set_title('Classifier performance.')
-    ax1.legend(loc=1)
+    if len(columns) > 1:
+        ax1.legend(columns, loc=1)
     ax1.text(0.8, 0.95, options.plotlabel, transform=ax1.transAxes, va='top', size=MEDIUM_SIZE)
     ax1.text(0.1, 0.95, options.panellabel, transform=ax1.transAxes, va='top', size=MEDIUM_SIZE, weight='bold')
 
@@ -88,8 +97,10 @@ def plotHistogram(data, options):
     ax1.xaxis.set_minor_locator(ml)
     ax1.get_xaxis().set_tick_params(which='both', direction='out')
     ax1.set_xlim(float(options.binlower), float(options.binupper))
+
+    ax1.set_ylim(ymin=0)
     if options.ylimit:
-        ax1.set_ylim(0,float(options.ylimit))
+        ax1.set_ylim(1,float(options.ylimit))
 
     if options.log:
         ax1.set_yscale('log')
@@ -108,13 +119,20 @@ def plotHistogram(data, options):
 def doPlots(options):
     # There may be more than one inputFile
     allData = []
+    columns = options.column.split(',')
+    i = 0
     for datafile in options.inputFile:
         data = []
         dataRows = readGenericDataFile(datafile, delimiter='\t')
 
         for row in dataRows:
-            data.append(float(row[options.column]))
+            if len(columns) == len(options.inputFile):
+                datum = float(row[columns[i]])
+            else:
+                datum = float(row[options.column])
+            data.append(datum)
         allData.append(data)
+        i += 1
 
     plotHistogram(allData, options)
 
@@ -122,7 +140,6 @@ def doPlots(options):
 def main():
     opts = docopt(__doc__, version='0.1')
     opts = cleanOptions(opts)
-    print(opts)
     options = Struct(**opts)
 
     doPlots(options)
