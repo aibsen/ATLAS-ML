@@ -224,6 +224,8 @@ def runKerasTensorflowClassifier(opts, processNumber = None):
         imageFilenames = getImages(conn, database, objectList, imageRoot=options.imageroot)
         if len(imageFilenames) == 0:
             print("NO IMAGES")
+            conn.close()
+            return []
 
     if ps1Data:
         objectDictPS1 = getRBValues([f['filename'] for f in imageFilenames], options.ps1classifier, extension = 1)
