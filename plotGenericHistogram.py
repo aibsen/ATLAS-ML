@@ -29,7 +29,7 @@ Options:
 import sys
 __doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
 from docopt import docopt
-import os, MySQLdb, shutil, re, csv, subprocess
+import os, shutil, re, csv, subprocess
 from gkutils import Struct, cleanOptions, readGenericDataFile
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
@@ -110,7 +110,7 @@ def doPlots(options):
     allData = []
     for datafile in options.inputFile:
         data = []
-        dataRows = readGenericDataFile(datafile, delimiter='\t')
+        dataRows = readGenericDataFile(datafile, delimiter=' ')
 
         for row in dataRows:
             data.append(float(row[options.column]))
