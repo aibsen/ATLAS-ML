@@ -2,13 +2,14 @@
 """Plot histogram to show performance of the specified trained classifier.
 
 Usage:
-  %s <inputFile>... [--column=<column>] [--outputFile=<file>] [--binwidth=<binwidth>] [--threshold=<threshold>] [--log] [--xlabel=<xlabel>] [--ylabel=<ylabel>] [--binlower=<binlower>] [--binupper=<binupper>] [--majorticks=<majorticks>] [--minorticks=<minorticks>] [--plotlabel=<plotlabel>] [--panellabel=<panellabel>] [--ylimit=<ylimit>] [--alpha=<alpha>] [--colour=<colour>]
+  %s <inputFile>... [--delimiter=<delimiter>] [--column=<column>] [--outputFile=<file>] [--binwidth=<binwidth>] [--threshold=<threshold>] [--log] [--xlabel=<xlabel>] [--ylabel=<ylabel>] [--binlower=<binlower>] [--binupper=<binupper>] [--majorticks=<majorticks>] [--minorticks=<minorticks>] [--plotlabel=<plotlabel>] [--panellabel=<panellabel>] [--ylimit=<ylimit>] [--alpha=<alpha>] [--colour=<colour>] [--leglabels=<leglabels>]
   %s (-h | --help)
   %s --version
 
 Options:
   -h --help                    Show this screen.
   --version                    Show version.
+  --delimiter=<delimiter>      Delimiter to use [default: ,]
   --column=<column>            Column to plot. Use comma separation, no spaces if more than one [default: disc_mag]
   --outputFile=<file>          Output file. If not defined, show plot.
   --threshold=<threshold>      Threshold at which the classifier is in use. Plots a dotted line on the histogram.
@@ -25,6 +26,7 @@ Options:
   --colour=<colour>            Specify colour or more than one colour separated commas with no spaces. [default: orange,cyan]
   --alpha=<alpha>              transparency setting - comma separated no spaces if more than one alpha [default: 0.5]
   --log                        Plot log(y) instead of y.
+  --leglabels=<leglabels>      Legend labels (alternative to using the columns).
 """
 import sys
 __doc__ = __doc__ % (sys.argv[0], sys.argv[0], sys.argv[0])
@@ -54,6 +56,9 @@ def plotHistogram(data, options):
     colours = options.colour.split(',')
     alphas = options.alpha.split(',')
     columns = options.column.split(',')
+    leglabels = None
+    if options.leglabels:
+        leglabels = options.leglabels.split(',')
     #fig = plt.figure(figsize=(6,3))
     fig = plt.figure()
 
@@ -61,6 +66,7 @@ def plotHistogram(data, options):
 
     #bins = n.linspace(round(float(options.binlower)), round(float(options.binupper)), int((float(options.binupper) - float(options.binlower))/float(options.binwidth))+1)
     bins = n.linspace(float(options.binlower), float(options.binupper), int((float(options.binupper) - float(options.binlower))/float(options.binwidth))+1)
+    print(bins)
 
     ml = MultipleLocator(float(options.majorticks))
     ax1.xaxis.set_major_locator(ml)
@@ -79,7 +85,8 @@ def plotHistogram(data, options):
         else:
             alpha = alphas[i]
 
-        ax1.hist(n.array(d), bins=bins, color = colour, edgecolor='black', linewidth=0.5, alpha = float(alpha))
+        print(n.sort(n.array(d)))
+        ax1.hist(n.sort(n.array(d)), bins=bins, color = colour, edgecolor='black', linewidth=0.5, alpha = float(alpha))
         i += 1
 
     ax1.set_ylabel(options.ylabel)
@@ -89,7 +96,10 @@ def plotHistogram(data, options):
     ax1.set_xlabel(options.xlabel)
     #ax1.set_title('Classifier performance.')
     if len(columns) > 1:
-        ax1.legend(columns, loc=1)
+        ax1.legend(columns, loc=1, frameon=False)
+    elif leglabels is not None:
+        ax1.legend(leglabels, loc=1, frameon=False)
+
     ax1.text(0.8, 0.95, options.plotlabel, transform=ax1.transAxes, va='top', size=MEDIUM_SIZE)
     ax1.text(0.1, 0.95, options.panellabel, transform=ax1.transAxes, va='top', size=MEDIUM_SIZE, weight='bold')
 
@@ -123,14 +133,17 @@ def doPlots(options):
     i = 0
     for datafile in options.inputFile:
         data = []
-        dataRows = readGenericDataFile(datafile, delimiter=' ')
+        dataRows = readGenericDataFile(datafile, delimiter=options.delimiter)
 
         for row in dataRows:
             if len(columns) == len(options.inputFile):
                 datum = float(row[columns[i]])
             else:
                 datum = float(row[options.column])
-            data.append(datum)
+            if datum < 16.0:
+                print(datum)
+            if datum > 0:
+                data.append(datum)
         allData.append(data)
         i += 1
 
