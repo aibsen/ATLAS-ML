@@ -24,7 +24,11 @@ class TargetImage(object):
         self.objectID = self.fitsFile.split("_")[0]
         self.extent = extent
         pathAndFitsFile = fitsFile 
-        hdulist = pyfits.open(pathAndFitsFile)
+        try:
+            hdulist = pyfits.open(pathAndFitsFile)
+        except OSError as e:
+            print("Problem opening %s" % pathAndFitsFile)
+
         data = hdulist[extension].data # think this reads in x and y opposite to ds9 see docs
         maxX = np.shape(data[0])
         maxY = np.shape(data[1])
